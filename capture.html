@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>吃早餐｜截圖辨識</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f7f4;color:#193e34;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}header{background:#235749;color:#fff;padding:18px}header h1{font-size:22px;margin:0}.main{padding:15px;max-width:760px;margin:auto}.card{padding:16px;border-radius:15px;background:#fff;margin-bottom:13px;border:1px solid #dce8df}input,textarea{font-size:16px;width:100%;border:1px solid #b9d1c4;border-radius:9px;padding:10px;margin:5px 0 10px}label{font-size:13px;font-weight:600}button,.button{background:#235749;color:white;border:0;padding:12px 14px;border-radius:10px;font-size:15px;display:inline-block;text-decoration:none}button:disabled{opacity:.5}.muted{color:#637d70;font-size:13px}.warn{background:#fff1d8;padding:12px;border-radius:10px;font-size:13px}.candidate{padding:12px 0;border-top:1px solid #e4e9e6}.cols{display:grid;grid-template-columns:1fr 1fr;gap:9px}img{max-width:100%;height:auto;margin-top:10px}.status{font-weight:bold;color:#28624d;font-size:13px;white-space:pre-line}a{color:#25694b}
+</style></head>
+<body><header><h1>📷 吃早餐｜LINE 截圖匯入</h1><small>辨識 → 核對 → 送審 → 正式訂單</small></header>
+<main class="main">
+<div class="warn">這是手機測試版。OCR 可能讀錯姓名、日期、數量、加料，不能直接當成正式訂單。選擇圖片後，在手機瀏覽器內辨識；模型從外部 CDN 下載，請保持網路連線。訂單仍只儲存在此手機的瀏覽器。</div>
+<p><a href="./index.html">← 返回訂單管家</a></p>
+<div class="card"><h3>① 上傳 LINE 截圖</h3><input id="pics" type="file" accept="image/*" multiple><button id="start" onclick="scan()">開始辨識</button><p id="status" class="status"></p><div id="previews"></div></div>
+<div class="card"><h3>② 校正辨識文字</h3><p class="muted">OCR 若無法讀取，也可以把 LINE 對話文字貼在此處。每筆候選單仍須自行核對。</p><textarea id="raw" rows="9" placeholder="例如：11/6 王小美 蜂蜜燕麥貝果 2 顆，不加醬"></textarea><button onclick="propose()">產生候選訂單</button></div>
+<div class="card"><h3>③ 審核候選訂單</h3><p class="muted">只有勾選「確認為新增訂單」的資料，才會送入待審核。既有訂單的修改、取消請返回主頁，在原訂單上修改。</p><div id="candidates"></div><button onclick="submitCandidates()">送入待審核</button><p id="msg" class="status"></p></div>
+</main>
+<script>
+const KEY='breakfast-mobile-safe-v1';
+const el=id=>document.getElementById(id);
+const escapeHtml=v=>String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let rows=[],ocr=null;
+let db;
+try{db=JSON.parse(localStorage.getItem(KEY))||{orders:[],pending:[],audit:[]}}catch(e){db={orders:[],pending:[],audit:[]}}
+const ids=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,10);
+const known=['巧克力藍莓乳酪','南瓜焦糖乳酪','鐵觀音桂圓','松露鹽之花','蜂蜜燕麥','起司三重奏','原味明太子','大甲芋頭','南瓜焦糖','巧克力藍莓','三明治','帕瑪森','布里歐','漢堡','吐司','沙拉','紅茶','咖啡','奶茶','貝果'];
+async function scan(){
+const files=Array.from(el('pics').files);if(!files.length){alert('請先選擇截圖');return}
+el('start').disabled=true;
+try{
+el('status').textContent='正在載入辨識程式…';
+if(!window.Tesseract){
+await new Promise((ok,bad)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';s.onload=ok;s.onerror=()=>bad(new Error('OCR 程式下載失敗'));document.head.appendChild(s)})
+}
+if(!ocr)ocr=await Tesseract.createWorker('chi_tra+eng',1,{logger:m=>{if(m.status==='recognizing text')el('status').textContent='辨識中 '+Math.round((m.progress||0)*100)+'%'}});
+let blocks=[];el('previews').innerHTML='';
+for(let i=0;i<files.length;i++){
+const f=files[i];el('status').textContent='辨識第 '+(i+1)+' / '+files.length+' 張';
+const u=URL.createObjectURL(f),img=document.createElement('img');img.src=u;img.alt='截圖 '+(i+1);el('previews').appendChild(img);
+const res=await ocr.recognize(f);blocks.push('【截圖 '+(i+1)+'】\n'+res.data.text);
+}
+el('raw').value=blocks.join('\n\n');el('status').textContent='辨識完成。請校正文字，再按「產生候選訂單」。';
+}catch(e){el('status').textContent='辨識失敗：'+e.message+'。可直接貼上文字。'}finally{el('start').disabled=false}
+}
+function dateOf(line){
+let m=String(line).match(/(?:(20\d{2})[\/.-])?(\d{1,2})[\/.-](\d{1,2})/);if(!m)return '';
+return (m[1]||new Date().getFullYear())+'/'+String(+m[2]).padStart(2,'0')+'/'+String(+m[3]).padStart(2,'0')
+}
+function propose(){
+const raw=el('raw').value;if(!raw.trim()){alert('請先辨識或貼上文字');return}
+rows=[];let date='',customer='';
+for(const original of raw.split(/\n/)){
+const line=original.trim();if(!line||line.startsWith('【截圖'))continue;
+const foundDate=dateOf(line);if(foundDate)date=foundDate;
+const name=line.match(/^([^\s:：]{2,18})[:：]\s*/);if(name&&!known.some(k=>name[1].includes(k)))customer=name[1];
+const matching=known.filter(k=>line.includes(k)).sort((a,b)=>b.length-a.length);
+if(!matching.length)continue;
+const item=matching[0],at=line.indexOf(item),tail=line.slice(at+item.length);
+const n=tail.match(/[xX×*]\s*(\d{1,2})|(\d{1,2})\s*(?:顆|個|份|杯)/);
+const qty=n?Number(n[1]||n[2]):1;
+const candidateCustomer=customer||'';
+rows.push({customer:candidateCustomer,date,item,qty,notes:line,checked:false,flag:/取消|改成|更改|改期|修改|換成/.test(line)});
+}
+if(!rows.length)rows.push({customer:'',date,item:'',qty:1,notes:raw.slice(0,300),checked:false,flag:true});
+draw();
+}
+function draw(){
+el('candidates').innerHTML=rows.map((r,i)=>'<div class="candidate"><label><input style="width:auto;display:inline" type="checkbox" data-i="'+i+'" data-f="checked" '+(r.checked?'checked':'')+'> 確認為新的有效訂單</label><div class="cols"><label>客人<input data-i="'+i+'" data-f="customer" value="'+escapeHtml(r.customer)+'"></label><label>取餐日<input data-i="'+i+'" data-f="date" value="'+escapeHtml(r.date)+'" placeholder="2026/11/06"></label><label>品項<input data-i="'+i+'" data-f="item" value="'+escapeHtml(r.item)+'"></label><label>數量<input type="number" min="1" data-i="'+i+'" data-f="qty" value="'+r.qty+'"></label></div><label>原文／客製備註<textarea rows="3" data-i="'+i+'" data-f="notes">'+escapeHtml(r.notes)+'</textarea></label>'+(r.flag?'<p style="color:#a34730">可能是異動／取消，請不要當成新訂單</p>':'')+'</div>').join('');
+el('candidates').querySelectorAll('[data-i]').forEach(node=>node.addEventListener(node.type==='checkbox'?'change':'input',()=>{
+const row=rows[Number(node.dataset.i)],field=node.dataset.f;row[field]=field==='checked'?node.checked:field==='qty'?Number(node.value):node.value
+}));
+el('msg').textContent='產生 '+rows.length+' 筆候選，尚未更新正式訂單。';
+}
+function submitCandidates(){
+const selected=rows.filter(r=>r.checked);if(!selected.length){alert('請先勾選核對完成的新訂單');return}
+for(const r of selected){
+if(r.flag){alert('包含疑似修改或取消的訊息，請回主頁修改既有訂單，不可新增');return}
+if(!r.customer.trim()||!r.item.trim()||!/^20\d{2}\/\d{2}\/\d{2}$/.test(r.date)||!Number.isInteger(r.qty)||r.qty<1){alert('請填寫正確姓名、YYYY/MM/DD 日期、品項及數量');return}
+const duplicate=db.orders.concat(db.pending.map(p=>p.after).filter(Boolean)).some(o=>o&&o.customer===r.customer&&o.date===r.date&&o.item===r.item&&o.qty===r.qty);
+if(duplicate){alert('偵測到可能重複：'+r.customer+' '+r.item+'。請回主頁核對，未匯入。');return}
+}
+selected.forEach(r=>db.pending.push({id:ids(),type:'add',after:{id:ids(),customer:r.customer.trim(),date:r.date,item:r.item.trim(),qty:r.qty,notes:r.notes,price:null,status:'active',source:'LINE 截圖OCR／人工核對'}}));
+try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){alert('手機儲存失敗，無法匯入');return}
+rows=rows.filter(r=>!r.checked);draw();el('msg').textContent='已送出 '+selected.length+' 筆待審核。請回主頁「審核」，逐筆確認後再產生訂單卡。';
+}
+</script></body></html>
