@@ -3,7 +3,7 @@
 <header><div class="row"><strong>🥯 吃早餐｜雲端訂單</strong><span id="who">尚未登入</span></div><small>雙管理者｜相同權限｜共同資料庫</small></header>
 <div class="wrap">
 <div id="notConfigured" class="warning">⚙️ 雲端資料庫尚未完成設定。這個頁面已經具備登入與同步程式，但需要先建立 Supabase 專案、執行資料庫 SQL、加入兩位管理者，才會啟用正式訂單。<a href="./CLOUD_SETUP.md">查看設定說明</a></div>
-<div id="loginCard" class="card"><h2>🔐 管理者登入</h2><p class="hint">只有經資料庫授權的兩個帳號，才可存取正式訂單。每個人使用自己的帳號和密碼。</p><form id="loginForm"><label>電子郵件<input type="email" id="email" autocomplete="username" required></label><label>密碼<input type="password" id="password" autocomplete="current-password" required></label><button type="submit" id="signIn">登入共同訂單</button></form><p id="loginMsg" class="status"></p></div>
+<div id="loginCard" class="card"><h2>🔐 管理者登入</h2><p class="hint">只有經資料庫授權的兩個帳號，才可存取正式訂單。每個人使用自己的帳號和密碼。</p><form id="loginForm"><label>電子郵件<input type="email" id="email" autocomplete="username" required></label><label>密碼<input type="password" id="password" autocomplete="current-password" required></label><button type="submit" id="signIn">登入共同訂單</button></form><p id="loginMsg" class="status"></p><p><a href="./reset-password.html">尚未設定密碼／忘記密碼？點這裡</a></p></div>
 <div id="passwordCard" class="card hidden"><h2>🔑 完成帳號啟用／設定新密碼</h2><p class="hint">從 Supabase 邀請信或密碼重設信進入時，請為自己的管理者帳號設定密碼（至少 12 個字元）。</p><form id="newPasswordForm"><label>新密碼<input id="newPassword" type="password" autocomplete="new-password" minlength="12" required></label><label>再次輸入新密碼<input id="confirmPassword" type="password" autocomplete="new-password" minlength="12" required></label><button type="submit">設定新密碼</button></form><p id="passwordMsg" class="status"></p></div><div id="main" class="hidden">
 <div class="card row"><b id="syncStatus">正在連接雲端…</b><div><button class="secondary" onclick="reload()">同步資料</button> <button class="secondary" onclick="signOut()">登出</button></div></div>
 <div id="dashboard" class="screen"><h2>📊 製作統計</h2><label>取餐日期<select id="dateFilter" onchange="draw()"></select></label><div class="counts" id="cards"></div><h3>貝果口味</h3><div id="bagelStats"></div><h3>其他餐點</h3><div id="otherStats"></div></div>
@@ -24,13 +24,20 @@ const rank=s=>bagel(s)?0:/三明治/.test(s)?1:/漢堡|帕瑪森|布里歐/.test
 const info=s=>{$('syncStatus').textContent=s};
 async function boot(){
 const config=window.BREAKFAST_CLOUD||{};
-if(!config.url||!config.publishableKey||config.url.includes('YOUR_'))return;
+if(!config.url||!config.publishableKey){$('notConfigured').classList.remove('hidden');return}
 $('notConfigured').classList.add('hidden');
-if(!window.supabase||!window.supabase.createClient){$('loginMsg').textContent='雲端登入元件未載入，請重新整理';return}
-client=window.supabase.createClient(config.url,config.publishableKey);
-const {data}=await client.auth.getSession();await setSession(data.session);
-client.auth.onAuthStateChange((ev,s)=>{if(ev==='PASSWORD_RECOVERY'){setTimeout(()=>showPasswordSetup(),0)}else if(ev==='SIGNED_IN'||ev==='SIGNED_OUT'||ev==='TOKEN_REFRESHED'){setTimeout(()=>setSession(s),0)}});
-if((location.hash.includes('type=invite')||location.hash.includes('type=recovery')||location.search.includes('type=invite')||location.search.includes('type=recovery'))&&data.session){showPasswordSetup()}
+if(!window.supabase||!window.supabase.createClient){$('loginMsg').textContent='登入元件載入失敗';return}
+const incoming=new URLSearchParams(location.hash.substring(1)),q=new URLSearchParams(location.search);
+const setupRequested=['recovery','invite'].includes(incoming.get('type'))||['recovery','invite'].includes(q.get('type'))||q.has('setup');
+client=window.supabase.createClient(config.url,config.publishableKey,{auth:{detectSessionInUrl:true,persistSession:true}});
+client.auth.onAuthStateChange((ev,s)=>{
+ if(ev==='PASSWORD_RECOVERY'){setTimeout(()=>{session=s;showPasswordSetup()},0);return}
+ if(ev==='SIGNED_IN'&&setupRequested){setTimeout(()=>{session=s;showPasswordSetup()},0);return}
+ if(ev==='SIGNED_IN'||ev==='SIGNED_OUT'||ev==='TOKEN_REFRESHED'){setTimeout(()=>setSession(s),0)}
+});
+const {data,error}=await client.auth.getSession();
+if(error){$('loginMsg').textContent=error.message}
+if(setupRequested&&data.session){session=data.session;showPasswordSetup()}else await setSession(data.session)
 }
 async function setSession(s){
 if(!client)return;session=s;
