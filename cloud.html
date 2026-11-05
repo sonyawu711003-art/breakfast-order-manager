@@ -4,7 +4,7 @@
 <div class="wrap">
 <div id="notConfigured" class="warning">⚙️ 雲端資料庫尚未完成設定。這個頁面已經具備登入與同步程式，但需要先建立 Supabase 專案、執行資料庫 SQL、加入兩位管理者，才會啟用正式訂單。<a href="./CLOUD_SETUP.md">查看設定說明</a></div>
 <div id="loginCard" class="card"><h2>🔐 管理者登入</h2><p class="hint">只有經資料庫授權的兩個帳號，才可存取正式訂單。每個人使用自己的帳號和密碼。</p><form id="loginForm"><label>電子郵件<input type="email" id="email" autocomplete="username" required></label><label>密碼<input type="password" id="password" autocomplete="current-password" required></label><button type="submit" id="signIn">登入共同訂單</button></form><p id="loginMsg" class="status"></p></div>
-<div id="main" class="hidden">
+<div id="passwordCard" class="card hidden"><h2>🔑 完成帳號啟用／設定新密碼</h2><p class="hint">從 Supabase 邀請信或密碼重設信進入時，請為自己的管理者帳號設定密碼（至少 12 個字元）。</p><form id="newPasswordForm"><label>新密碼<input id="newPassword" type="password" autocomplete="new-password" minlength="12" required></label><label>再次輸入新密碼<input id="confirmPassword" type="password" autocomplete="new-password" minlength="12" required></label><button type="submit">設定新密碼</button></form><p id="passwordMsg" class="status"></p></div><div id="main" class="hidden">
 <div class="card row"><b id="syncStatus">正在連接雲端…</b><div><button class="secondary" onclick="reload()">同步資料</button> <button class="secondary" onclick="signOut()">登出</button></div></div>
 <div id="dashboard" class="screen"><h2>📊 製作統計</h2><label>取餐日期<select id="dateFilter" onchange="draw()"></select></label><div class="counts" id="cards"></div><h3>貝果口味</h3><div id="bagelStats"></div><h3>其他餐點</h3><div id="otherStats"></div></div>
 <div id="manage" class="screen hidden"><h2>📝 共同訂單</h2><input id="search" placeholder="搜尋客人或品項" oninput="draw()"><div class="card" id="orderList"></div><div class="card"><h3 id="formTitle">新增訂單</h3><form id="orderForm"><input id="editId" type="hidden"><input id="editVersion" type="hidden"><label>客人名稱<input id="customer" required maxlength="100"></label><label>取餐日期<input id="pickup" type="date" required></label><label>品項<input id="item" required maxlength="200"></label><div class="grid"><label>數量<input id="qty" type="number" min="1" max="999" value="1" required></label><label>單價（可空白）<input id="price" type="number" min="0" step=".01"></label></div><label>客製備註<textarea id="notes" rows="3"></textarea></label><button type="submit">確認儲存至雲端</button> <button type="button" class="secondary" onclick="clearForm()">清除</button></form></div></div>
@@ -29,11 +29,12 @@ $('notConfigured').classList.add('hidden');
 if(!window.supabase||!window.supabase.createClient){$('loginMsg').textContent='雲端登入元件未載入，請重新整理';return}
 client=window.supabase.createClient(config.url,config.publishableKey);
 const {data}=await client.auth.getSession();await setSession(data.session);
-client.auth.onAuthStateChange((ev,s)=>{if(ev==='SIGNED_IN'||ev==='SIGNED_OUT'||ev==='TOKEN_REFRESHED'){setTimeout(()=>setSession(s),0)}})
+client.auth.onAuthStateChange((ev,s)=>{if(ev==='PASSWORD_RECOVERY'){setTimeout(()=>showPasswordSetup(),0)}else if(ev==='SIGNED_IN'||ev==='SIGNED_OUT'||ev==='TOKEN_REFRESHED'){setTimeout(()=>setSession(s),0)}});
+if((location.hash.includes('type=invite')||location.hash.includes('type=recovery')||location.search.includes('type=invite')||location.search.includes('type=recovery'))&&data.session){showPasswordSetup()}
 }
 async function setSession(s){
 if(!client)return;session=s;
-if(!s){$('loginCard').classList.remove('hidden');$('main').classList.add('hidden');$('nav').classList.add('hidden');$('who').textContent='尚未登入';orders=[];if(subscription){client.removeChannel(subscription);subscription=null}if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null}return}
+if(!s){$('passwordCard').classList.add('hidden');$('loginCard').classList.remove('hidden');$('main').classList.add('hidden');$('nav').classList.add('hidden');$('who').textContent='尚未登入';orders=[];if(subscription){client.removeChannel(subscription);subscription=null}if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null}return}
 const {data,error}=await client.from('admin_users').select('user_id,display_name').eq('user_id',s.user.id).maybeSingle();
 if(error||!data){$('loginMsg').textContent='這個帳號尚未取得吃早餐管理權限。請由資料庫管理者加入帳號。';$('main').classList.add('hidden');$('nav').classList.add('hidden');$('loginCard').classList.remove('hidden');return}
 $('who').textContent=data.display_name;$('loginCard').classList.add('hidden');$('main').classList.remove('hidden');$('nav').classList.remove('hidden');await reload();
@@ -41,6 +42,8 @@ if(!subscription)subscription=client.channel('breakfast-orders').on('postgres_ch
 if(!refreshTimer)refreshTimer=setInterval(()=>{if(document.visibilityState==='visible')reload()},20000)
 }
 $('loginForm').addEventListener('submit',async e=>{e.preventDefault();if(!client){$('loginMsg').textContent='請先完成 Supabase 專案設定';return}$('signIn').disabled=true;$('loginMsg').textContent='登入中…';const {error}=await client.auth.signInWithPassword({email:$('email').value,password:$('password').value});$('signIn').disabled=false;$('loginMsg').textContent=error?error.message:'登入成功';});
+function showPasswordSetup(){$('passwordCard').classList.remove('hidden');$('loginCard').classList.add('hidden');$('main').classList.add('hidden');$('nav').classList.add('hidden')}
+$('newPasswordForm').addEventListener('submit',async e=>{e.preventDefault();if(!client)return;const p=$('newPassword').value;if(p.length<12||p!==$('confirmPassword').value){$('passwordMsg').textContent='兩次密碼不一致，或密碼少於 12 個字元';return}const {error}=await client.auth.updateUser({password:p});if(error){$('passwordMsg').textContent='設定失敗：'+error.message;return}$('passwordMsg').textContent='密碼設定成功';$('newPasswordForm').reset();$('passwordCard').classList.add('hidden');history.replaceState(null,'',location.pathname);const {data}=await client.auth.getSession();await setSession(data.session)});
 async function signOut(){if(client)await client.auth.signOut()}
 async function reload(){if(!session||!client)return;const {data,error}=await client.from('breakfast_orders').select('*').order('pickup_date',{ascending:true}).order('created_at',{ascending:true}).limit(5000);if(error){info('同步失敗：'+error.message);return}orders=data||[];info('✅ 已同步 '+orders.length+' 筆｜'+new Date().toLocaleTimeString('zh-TW'));draw()}
 function tab(name){document.querySelectorAll('.screen').forEach(e=>e.classList.toggle('hidden',e.id!==name));if(name==='printview')draw();if(name==='history')loadAudit()}
