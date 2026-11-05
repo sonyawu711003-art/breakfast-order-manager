@@ -1,2 +1,5 @@
-// Public Supabase client settings only. Never put secret/service_role keys here.
-window.BREAKFAST_CLOUD = { url: '', publishableKey: '' };
+// Browser-safe Supabase connection configuration. NEVER place service_role / sb_secret here.
+window.BREAKFAST_CLOUD = {
+  url: 'https://vikanvnqbdgavlpfdxyj.supabase.co',
+  publishableKey: 'sb_publishable_s8HfOdQU0RpnQljiGJwBmw_WuZCfJtF'
+};
