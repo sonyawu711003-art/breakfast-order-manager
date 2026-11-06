@@ -1,0 +1,115 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>吃早餐｜LINE 截圖雲端送審</title><style>
+*{box-sizing:border-box}body{margin:0;background:#f3f8f4;color:#234d40;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}header{background:#23594a;color:white;padding:18px}header h1{font-size:21px;margin:0}main{padding:16px;max-width:780px;margin:auto}h2{font-size:18px}.card{padding:15px;background:white;border:1px solid #d9e7dd;border-radius:14px;margin:12px 0}label{font-size:13px;font-weight:650}input,select,textarea{width:100%;font-size:16px;border:1px solid #bfd2c6;border-radius:9px;padding:10px;margin:5px 0 10px}textarea{min-height:80px}button{border:none;color:white;background:#245948;border-radius:10px;padding:12px 14px;font-size:15px;font-weight:650}button:disabled{opacity:.45}.alt{background:#e9f3ec;color:#245948}.row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}.cols{display:grid;grid-template-columns:1fr 1fr;gap:9px}.hint{font-size:12px;color:#657d71}.warn{background:#fff1d8;border-radius:11px;padding:12px;font-size:13px}.red{color:#aa492a;font-size:13px}.hidden{display:none!important}a{color:#27664f}img{max-width:100%;max-height:200px;object-fit:contain}.candidate{border:1px solid #e1eae4;border-radius:12px;padding:12px;margin:12px 0}.status{white-space:pre-wrap;font-size:13px;color:#8d5333}</style></head><body>
+<header><h1>📸 吃早餐｜LINE 截圖雲端匯入</h1><small>兩位管理者共用待審核；確認後才會更新正式訂單</small></header><main>
+<p><a href="./cloud.html">← 返回雲端訂單管家</a></p>
+<div class="warn">⚠️ OCR 只能協助辨識文字，無法保證理解追加、改期、取消及加料。請逐筆核對客人、取餐日、品項、數量與備註。原始截圖會放在僅管理者可讀的私密儲存空間，審核者能查看。</div>
+<div class="card" id="access"><b>登入狀態確認中…</b></div>
+<div id="content" class="hidden">
+<div class="card"><h2>① 選擇 LINE 截圖</h2><input id="images" type="file" multiple accept="image/png,image/jpeg,image/webp"><button id="scanBtn" onclick="scanImages()">辨識截圖</button><div id="scanMsg" class="status"></div><div id="thumbnails"></div></div>
+<div class="card"><h2>② 核對原始文字</h2><p class="hint">可貼上 LINE 匯出的文字，也可直接改正 OCR 內容。識別結果還不是正式訂單。</p><textarea rows="9" id="rawText" placeholder="可先選擇截圖辨識，或貼上 LINE 原始對話"></textarea><label>預設取餐日期（無法辨識時用）<input type="date" id="defaultDate"></label><button onclick="extractCandidates()">從文字產生候選單</button> <button class="alt" onclick="addCandidate()">手動新增一筆候選</button></div>
+<div class="card"><h2>③ 人工確認候選訂單</h2><p class="hint">姓名、日期、價格可能辨識錯誤；新增會檢查相似既有單。修改與取消必須選擇原訂單。標示為待處理後，兩位管理者都能在共同審核頁確認。</p><div id="candidates"></div><button id="send" onclick="sendToCloud()">送出勾選的候選單至共同審核</button><p id="sendMsg" class="status"></p></div>
+</div></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script><script src="./cloud-config.js"></script>
+<script>
+let api=null,user=null,menu=[],existing=[],proposals=[],selectedFiles=[],fileHashes=[],fileTexts=[];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=v=>v==null?'未定價':'$'+Number(v).toFixed(0);
+const categories=['巧克力藍莓乳酪','南瓜焦糖乳酪','鐵觀音桂圓','松露鹽之花','蜂蜜燕麥','起司三重奏','原味明太子','大甲芋頭','南瓜焦糖','巧克力藍莓','三明治','帕瑪森','布里歐','漢堡','吐司','沙拉','紅茶','咖啡','奶茶','貝果'];
+function localDate(v){const m=String(v).match(/(?:(20\d{2})[\/.-])?(\d{1,2})[\/.-](\d{1,2})/);if(!m)return null;const y=m[1]||new Date().getFullYear();const d=y+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0');return Number(m[2])<=12&&Number(m[3])<=31?d:null}
+async function init(){const cfg=window.BREAKFAST_CLOUD||{};
+if(!window.supabase?.createClient||!cfg.url||!cfg.publishableKey){$('access').textContent='雲端設定尚未完成';return}
+api=window.supabase.createClient(cfg.url,cfg.publishableKey);const {data:auth}=await api.auth.getUser();user=auth?.user;
+if(!user){$('access').innerHTML='請先從 <a href="./cloud.html">雲端訂單</a> 登入，再返回此處';return}
+const {data:member,error:err}=await api.from('admin_users').select('display_name').eq('user_id',user.id).maybeSingle();
+if(err||!member){$('access').textContent='沒有管理權限，無法上傳截圖';return}
+$('access').textContent='✅ '+member.display_name+' 已登入；可上傳截圖並送共同審核';
+$('content').classList.remove('hidden');
+const [m,o]=await Promise.all([api.from('breakfast_menu').select('*').eq('active',true).order('name'),api.from('breakfast_orders').select('id,customer,pickup_date,item,quantity,price,total_override,notes,version,status').eq('status','active').order('pickup_date',{ascending:false}).limit(3000)]);
+if(m.error||o.error){$('access').textContent='請先執行 Supabase 升級 SQL：'+(m.error?.message||o.error?.message);$('content').classList.add('hidden');return}
+menu=m.data||[];existing=o.data||[];
+}
+async function sha256(file){const bytes=await file.arrayBuffer();const buf=await crypto.subtle.digest('SHA-256',bytes);return Array.from(new Uint8Array(buf),x=>x.toString(16).padStart(2,'0')).join('')}
+async function loadOcr(){if(window.Tesseract)return;await new Promise((ok,bad)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';s.onload=ok;s.onerror=()=>bad(new Error('文字辨識模組下載失敗'));document.head.appendChild(s)})}
+async function scanImages(){
+selectedFiles=Array.from($('images').files);if(!selectedFiles.length){alert('請先選擇截圖');return}
+if(selectedFiles.some(f=>f.size>10*1024*1024||!['image/png','image/jpeg','image/webp'].includes(f.type))){alert('每張圖片不得超過 10 MB，僅支援 PNG/JPG/WebP');return}
+$('scanBtn').disabled=true;$('thumbnails').innerHTML='';fileHashes=[];fileTexts=[];
+try{
+await loadOcr();$('scanMsg').textContent='正在載入繁體中文文字辨識模型…';
+const worker=await Tesseract.createWorker('chi_tra+eng',1,{logger:x=>{if(x.status==='recognizing text')$('scanMsg').textContent='辨識進度 '+Math.round((x.progress||0)*100)+'%'}});
+for(let i=0;i<selectedFiles.length;i++){
+ const f=selectedFiles[i];$('scanMsg').textContent='辨識第 '+(i+1)+'／'+selectedFiles.length+' 張';
+ const img=new Image();img.src=URL.createObjectURL(f);img.alt='第 '+(i+1)+' 張截圖';$('thumbnails').appendChild(img);
+ fileHashes.push(await sha256(f));const result=await worker.recognize(f);fileTexts.push(result.data.text);
+}
+await worker.terminate();
+$('rawText').value=fileTexts.map((t,i)=>'【截圖'+(i+1)+'】\n'+t).join('\n\n');
+$('scanMsg').textContent='已辨識 '+selectedFiles.length+' 張。請核對文字。';
+}catch(e){$('scanMsg').textContent='辨識失敗：'+e.message+'。可改為貼上原始對話文字。'}
+finally{$('scanBtn').disabled=false}
+}
+function newCandidate(data={}){return {check:false,customer:'',date:$('defaultDate').value,item:'',qty:1,price:'',total:'',notes:'',mode:'add',target:'',sourceIndex:0,line:0,...data}}
+function extractCandidates(){
+const raw=$('rawText').value;if(!raw.trim()){alert('請先辨識或貼上文字');return}
+proposals=[];let date=$('defaultDate').value,customer='',sourceIndex=0;
+const lines=raw.split(/\r?\n/);
+lines.forEach((v,i)=>{const line=v.trim();if(!line)return;
+const source=line.match(/^【截圖(\d+)】/);if(source){sourceIndex=Number(source[1])-1;return}
+const d=localDate(line);if(d)date=d;
+const name=line.match(/^([^\s:：]{2,25})\s*[:：]\s*/);if(name&&!categories.some(k=>name[1].includes(k)))customer=name[1];
+const match=categories.filter(s=>line.includes(s)).sort((a,b)=>b.length-a.length)[0];if(!match)return;
+const ix=line.indexOf(match),tail=line.slice(ix+match.length);
+const q=tail.match(/[xX×*]\s*(\d{1,2})|(\d{1,2})\s*(?:顆|個|份|杯)/);
+const qty=q?Number(q[1]||q[2]):1;
+const m=menu.find(x=>x.name===match);
+const flag=/取消|改成|改期|更改|修改|換成|退訂/.test(line);
+proposals.push(newCandidate({customer,date,item:match,qty,price:m?.price??'',notes:line,mode:flag?'edit':'add',sourceIndex,line:i}));
+});
+if(!proposals.length)proposals=[newCandidate({notes:raw.slice(0,500),sourceIndex:0})];
+drawCandidates();
+}
+function addCandidate(){proposals.push(newCandidate());drawCandidates()}
+function targetOptions(value){return '<option value="">請選擇要更改／取消的原訂單</option>'+existing.map(o=>'<option value="'+o.id+'" '+(value===o.id?'selected':'')+'>'+esc(o.pickup_date+'｜'+o.customer+'｜'+o.item+' ×'+o.quantity)+'</option>').join('')}
+function drawCandidates(){
+$('candidates').innerHTML=proposals.map((p,i)=>'<div class="candidate"><label><input type="checkbox" data-i="'+i+'" data-k="check" style="width:auto;display:inline" '+(p.check?'checked':'')+'> 確認送共同審核</label><div class="cols"><label>客人<input data-i="'+i+'" data-k="customer" value="'+esc(p.customer)+'"></label><label>取餐日<input type="date" data-i="'+i+'" data-k="date" value="'+esc(p.date)+'"></label><label>品項<input data-i="'+i+'" data-k="item" value="'+esc(p.item)+'"></label><label>數量<input type="number" min="1" max="999" data-i="'+i+'" data-k="qty" value="'+p.qty+'"></label><label>單價（可修改）<input type="number" step=".01" min="0" data-i="'+i+'" data-k="price" value="'+esc(p.price)+'"></label><label>手動總額（可留白）<input type="number" step=".01" min="0" data-i="'+i+'" data-k="total" value="'+esc(p.total)+'"></label></div><label>異動類型<select data-i="'+i+'" data-k="mode"><option value="add" '+(p.mode==='add'?'selected':'')+'>新增</option><option value="edit" '+(p.mode==='edit'?'selected':'')+'>修改原訂單</option><option value="cancel" '+(p.mode==='cancel'?'selected':'')+'>取消原訂單</option></select></label><label>如為修改或取消，請選擇原訂單<select data-i="'+i+'" data-k="target">'+targetOptions(p.target)+'</select></label><label>原訊息／客製要求<textarea rows="3" data-i="'+i+'" data-k="notes">'+esc(p.notes)+'</textarea></label><div class="hint">預估：'+(p.total!==''?money(p.total):p.price!==''?money(Number(p.price)*p.qty):'未定價')+'；候選單可能辨識錯誤，請人工核對。</div><button class="alt" data-remove="'+i+'">移除此候選</button></div>').join('')||'<p class="hint">尚無候選訂單</p>';
+$('candidates').querySelectorAll('[data-i]').forEach(n=>n.addEventListener(n.type==='checkbox'?'change':'input',()=>{const p=proposals[Number(n.dataset.i)];const k=n.dataset.k;p[k]=k==='check'?n.checked:k==='qty'?Number(n.value):n.value}));
+$('candidates').querySelectorAll('[data-remove]').forEach(n=>n.onclick=()=>{proposals.splice(Number(n.dataset.remove),1);drawCandidates()});
+$('sendMsg').textContent='共有 '+proposals.length+' 筆候選，尚未更新正式訂單。';
+}
+async function sendToCloud(){
+const chosen=proposals.filter(p=>p.check);if(!chosen.length){alert('請先勾選並校正至少一筆候選單');return}
+for(const p of chosen){
+if(!p.customer.trim()||!p.item.trim()||!p.date||!Number.isInteger(p.qty)||p.qty<1){alert('客人、日期、品項或數量未填妥');return}
+if(['edit','cancel'].includes(p.mode)&&!p.target){alert('修改／取消必須選擇原訂單');return}
+if(p.mode==='add'&&existing.some(o=>o.customer.trim()===p.customer.trim()&&o.pickup_date===p.date&&o.item.trim()===p.item.trim()&&o.quantity===p.qty)){alert('可能重複新增：'+p.customer+'｜'+p.item+'。請改用修改訂單或先核對。');return}
+}
+const button=$('send');button.disabled=true;$('sendMsg').textContent='正在存放私密截圖並建立共用待審資料…';
+try{
+const paths={};
+for(const p of chosen){
+ if(selectedFiles[p.sourceIndex]&&!paths[p.sourceIndex]){
+  const f=selectedFiles[p.sourceIndex],hash=fileHashes[p.sourceIndex]||await sha256(f);
+  const ext=f.type==='image/png'?'png':f.type==='image/webp'?'webp':'jpg';
+  const path=user.id+'/'+hash+'.'+ext;
+  const {error}=await api.storage.from('breakfast-line-shots').upload(path,f,{upsert:false,contentType:f.type});
+  if(error&&!/already exists|duplicate|resource already exists|409/i.test(error.message))throw new Error('上傳圖片失敗：'+error.message);
+  paths[p.sourceIndex]=path;
+ }
+}
+let successes=0;
+for(const p of chosen){
+ const source=selectedFiles[p.sourceIndex]?fileHashes[p.sourceIndex]||await sha256(selectedFiles[p.sourceIndex]):null;
+ const target=existing.find(x=>x.id===p.target);
+ const rec={change_type:p.mode,target_order_id:p.mode==='add'?null:p.target||null,target_version:p.mode==='add'?null:target?.version||null,customer:p.customer.trim(),pickup_date:p.date,item:p.item.trim(),quantity:p.qty,price:p.price===''?null:Number(p.price),total_override:p.total===''?null:Number(p.total),notes:p.notes,ocr_text:$('rawText').value.slice(0,60000),screenshot_path:paths[p.sourceIndex]||null,source_hash:source?source+':'+p.line:null,submitted_by:user.id};
+ const {error}=await api.from('breakfast_proposals').insert(rec);
+ if(error)throw new Error('建立待審失敗：'+error.message);
+ successes++;p.check=false;
+}
+$('sendMsg').textContent='✅ 已送出 '+successes+' 筆共同待審訂單。請返回雲端首頁點「審核」進行核准。';
+drawCandidates();
+}catch(e){$('sendMsg').textContent='部分資料可能已送出，請先回共同審核清單確認，避免重送。\n'+e.message}
+finally{button.disabled=false}
+}
+init();
+</script></body></html>
