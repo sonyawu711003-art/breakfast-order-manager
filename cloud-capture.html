@@ -37,7 +37,7 @@ if(selectedFiles.some(f=>f.size>10*1024*1024||!['image/png','image/jpeg','image/
 $('scanBtn').disabled=true;$('thumbnails').innerHTML='';fileHashes=[];fileTexts=[];
 try{
 await loadOcr();$('scanMsg').textContent='正在載入繁體中文文字辨識模型…';
-const worker=await Tesseract.createWorker('chi_tra+eng',1,{logger:x=>{if(x.status==='recognizing text')$('scanMsg').textContent='辨識進度 '+Math.round((x.progress||0)*100)+'%'}});
+const worker=await Tesseract.createWorker(['chi_tra','eng'],1,{logger:x=>{if(x.status==='recognizing text')$('scanMsg').textContent='辨識進度 '+Math.round((x.progress||0)*100)+'%'}});
 for(let i=0;i<selectedFiles.length;i++){
  const f=selectedFiles[i];$('scanMsg').textContent='辨識第 '+(i+1)+'／'+selectedFiles.length+' 張';
  const img=new Image();img.src=URL.createObjectURL(f);img.alt='第 '+(i+1)+' 張截圖';$('thumbnails').appendChild(img);
