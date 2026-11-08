@@ -6,7 +6,7 @@
 <div class="card" id="access"><b>登入狀態確認中…</b></div>
 <div id="content" class="hidden">
 <div class="card"><h2>① 選擇 LINE 截圖</h2><input id="images" type="file" multiple accept="image/png,image/jpeg,image/webp"><button id="scanBtn" onclick="scanImages()">辨識截圖</button><div id="scanMsg" class="status"></div><div id="thumbnails"></div></div>
-<div class="card"><h2>② 核對原始文字</h2><p class="hint">更推薦直接匯入 LINE 匯出的聊天紀錄 TXT，可保留原本的發言人與時間；若只有照片，仍可用上方 OCR。</p><label>LINE 聊天紀錄 TXT（可選）<input type="file" id="chatTxt" accept=".txt,text/plain"></label><div class="cols"><label>只分析訊息日期：起<input id="txtFrom" type="date"></label><label>迄<input id="txtTo" type="date"></label></div><p class="hint">匯出整年聊天也沒關係，只分析選取期間的訊息；不會重新掃描全部歷史訂單。可改範圍補匯。</p><button class="alt" onclick="importChatTxt()">讀取 TXT 原始訊息</button><p class="hint">可貼上 LINE 匯出的文字，也可直接改正 OCR 內容。識別結果還不是正式訂單。</p><textarea rows="9" id="rawText" placeholder="可先選擇截圖辨識，或貼上 LINE 原始對話"></textarea><label>預設取餐日期（無法辨識時用）<input type="date" id="defaultDate"></label><button onclick="extractCandidates()">從文字產生候選單</button> <button class="alt" onclick="addCandidate()">手動新增一筆候選</button></div>
+<div class="card"><h2>② 核對原始文字</h2><p class="hint">更推薦直接匯入 LINE 匯出的聊天紀錄 TXT，可保留原本的發言人與時間；若只有照片，仍可用上方 OCR。</p><label>LINE 聊天紀錄 TXT（可選）<input type="file" id="chatTxt" accept=".txt,text/plain"></label><div class="cols"><label>訊息起始日期<input id="txtFrom" type="date"></label><label>訊息起始時間<input id="txtFromTime" type="time" value="00:00" step="60"></label><label>訊息結束日期<input id="txtTo" type="date"></label><label>訊息結束時間<input id="txtToTime" type="time" value="23:59" step="60"></label></div><p class="hint">依 LINE 訊息「發送日期＋時間」篩選，非取餐日期。起迄時間都包含在內，適合分批補讀新訂單；重複訊息送審時仍會嘗試排除。</p><button class="alt" onclick="importChatTxt()">讀取 TXT 原始訊息</button><p class="hint">可貼上 LINE 匯出的文字，也可直接改正 OCR 內容。識別結果還不是正式訂單。</p><textarea rows="9" id="rawText" placeholder="可先選擇截圖辨識，或貼上 LINE 原始對話"></textarea><label>預設取餐日期（無法辨識時用）<input type="date" id="defaultDate"></label><button onclick="extractCandidates()">從文字產生候選單</button> <button class="alt" onclick="addCandidate()">手動新增一筆候選</button></div>
 <div class="card"><h2>③ 依客人＋取餐日整單確認</h2><p class="hint">姓名、日期、價格可能辨識錯誤；新增會檢查相似既有單。修改與取消必須選擇原訂單。標示為待處理後，兩位管理者都能在共同審核頁確認。</p><div id="candidates"></div><button id="send" onclick="sendToCloud()">送出勾選的候選單至共同審核</button><p id="sendMsg" class="status"></p></div>
 </div></main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script><script src="./cloud-config.js"></script><script src="./line-parser-v2.js"></script><script src="./line-txt-v3.js"></script>
@@ -84,15 +84,19 @@ function extractCandidates(){
 const raw=$('rawText').value;if(!raw.trim()){alert('請先辨識或貼上文字');return}
 let parsed=[],unresolved=[],readCount=0;
 if(currentSource==='txt'){
- if($('txtFrom').value&&$('txtTo').value&&$('txtFrom').value>$('txtTo').value){alert('訊息起始日期不能晚於結束日期');return}
- const r=window.BreakfastLineTxt.candidates(raw,{from:$('txtFrom').value,to:$('txtTo').value,menu:menu.map(m=>m.name)});
+ const from=$('txtFrom').value,to=$('txtTo').value;
+ const fromTime=$('txtFromTime').value||'00:00',toTime=$('txtToTime').value||'23:59';
+ if(!from||!to){alert('請輸入完整的訊息起始與結束日期');return}
+ const fromDateTime=from+'T'+fromTime,toDateTime=to+'T'+toTime;
+ if(fromDateTime>toDateTime){alert('訊息起始日期／時間不能晚於結束日期／時間');return}
+ const r=window.BreakfastLineTxt.candidates(raw,{fromDateTime,toDateTime,menu:menu.map(m=>m.name)});
  parsed=r.candidates;unresolved=r.unresolved;readCount=r.messagesRead;
 }else parsed=window.BreakfastLineParser.parse(raw,{year:new Date().getFullYear(),defaultDate:$('defaultDate').value,menu:menu.map(m=>m.name)});
 proposals=parsed.map(p=>newCandidate({customer:p.customer,date:p.date,item:p.item,qty:p.qty,price:menu.find(m=>m.name===p.item)?.price??'',notes:p.notes,mode:p.mode,sourceIndex:p.sourceIndex||0,line:p.line,flag:p.reviewRequired,reason:p.reason,sourceMessageDate:p.messageDate||'',sourceMessageTime:p.messageTime||''}));
 unresolved.forEach(p=>proposals.push(newCandidate({customer:p.sender,date:'',notes:p.body,flag:true,reason:p.reason,mode:/取消|改|換/.test(p.body)?'edit':'add',line:p.line*1000,sourceMessageDate:p.posted,sourceMessageTime:p.time})));
 if(!proposals.length)proposals=[newCandidate({notes:currentSource==='txt'?'選定日期範圍內沒有辨識出候選訂單':raw.slice(0,500),flag:true,reason:'無法可靠判讀，請手動建立候選訂單',line:100000})];
 drawCandidates();
-if(currentSource==='txt')$('sendMsg').textContent='TXT 已解析：'+readCount+' 則訊息，產生 '+parsed.length+' 筆候選；另有 '+unresolved.length+' 則無法確定的訊息。都尚未更新正式訂單。';
+if(currentSource==='txt')$('sendMsg').textContent='已依發送時間 '+$('txtFrom').value+' '+($('txtFromTime').value||'00:00')+' 至 '+$('txtTo').value+' '+($('txtToTime').value||'23:59')+' 篩選；整份檔案解析 '+readCount+' 則訊息，符合且辨識 '+parsed.length+' 筆候選，另有 '+unresolved.length+' 則需核對。尚未更新正式訂單。';
 }
 function addCandidate(){proposals.push(newCandidate({line:100000+proposals.length}));drawCandidates()}
 function targetOptions(value){return '<option value="">請選擇要更改／取消的原訂單</option>'+existing.map(o=>'<option value="'+o.id+'" '+(value===o.id?'selected':'')+'>'+esc(o.pickup_date+'｜'+o.customer+'｜'+o.item+' ×'+o.quantity)+'</option>').join('')}
