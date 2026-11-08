@@ -1,0 +1,54 @@
+/* 吃早餐｜活力雲端工作台 2026-11-08
+   只調整視覺與導覽，不更動登入、訂單、審核及資料模型。 */
+:root{--cream:#fff8e8;--vanilla:#ffedbf;--caramel:#713b20;--amber:#e58224;--peach:#ffd8b6;--line:#f0d9bc;--soft:#fffdf7;--muted:#8f6a51}
+body:not(.login-mode){background:radial-gradient(circle at 85% 0,#fff0b5 0,transparent 37%),linear-gradient(175deg,#fff8eb 0,#fff4e5 60%,#ffead6 100%);color:var(--caramel)}
+body:not(.login-mode)>header{background:linear-gradient(110deg,#824420,#c77730 70%,#f2a744);border-bottom:4px solid #fbc77f;box-shadow:0 8px 24px #8e4c2833;padding:14px max(16px,calc((100vw - 760px)/2 + 16px));position:relative;overflow:hidden}
+body:not(.login-mode)>header::after{content:"✦  ✦";position:absolute;right:8%;top:2px;font-size:42px;letter-spacing:26px;color:#ffdf9942;pointer-events:none}
+body:not(.login-mode)>header .row{position:relative;z-index:1;gap:6px}
+body:not(.login-mode)>header strong{font-size:clamp(19px,4vw,25px);letter-spacing:.03em;text-shadow:0 2px 2px #54260c33}
+body:not(.login-mode)>header small{color:#ffe9b9;font-weight:650;font-size:12px;letter-spacing:.02em}
+body:not(.login-mode)>header #who{color:#7a3d1d;background:#fff4d7;border:1px solid #fff8e6;padding:7px 11px;border-radius:99px;font-size:12px;font-weight:850;box-shadow:0 2px 7px #67320a25}
+body:not(.login-mode) .wrap{max-width:780px;padding:18px 14px 120px}
+body:not(.login-mode) .card{background:#fffefa;border:1px solid #efddc6;border-radius:21px;box-shadow:0 6px 20px #b9763b12;padding:17px;margin-bottom:14px}
+body:not(.login-mode) .hint{color:#927058;line-height:1.65}
+body:not(.login-mode) .note{color:#b05a35}
+body:not(.login-mode) h2{color:#773c20;font-weight:900;font-size:21px;letter-spacing:.025em;margin:18px 0 13px}
+body:not(.login-mode) h3{color:#86502d;font-size:17px;font-weight:850}
+body:not(.login-mode) .screen>h2{padding:13px 16px;background:#fff2d4;border:1px solid #f6d69e;border-radius:17px;box-shadow:0 4px 12px #f0a85814;display:flex;align-items:center;min-height:56px}
+body:not(.login-mode) button{background:linear-gradient(135deg,#e99134,#d36b20);color:#fff;font-weight:800;border-radius:13px;border:1px solid #df8a35;min-height:43px;padding:11px 15px;box-shadow:0 4px 12px #bb69241b;cursor:pointer}
+body:not(.login-mode) button.secondary{background:#fff3de;color:#8b4d24;border:1px solid #eccda7;box-shadow:none}
+body:not(.login-mode) button:disabled{opacity:.52;cursor:not-allowed}
+body:not(.login-mode) button:focus-visible,body:not(.login-mode) a:focus-visible{outline:3px solid #d98d36;outline-offset:3px}
+body:not(.login-mode) a{color:#a34e20}
+body:not(.login-mode) input:not([type=checkbox]):not([type=radio]),body:not(.login-mode) select,body:not(.login-mode) textarea{background:#fffcf5;border:1.5px solid #ead5bc;border-radius:13px;color:#5d3621;min-height:46px;padding:11px 12px}
+body:not(.login-mode) input:focus,body:not(.login-mode) select:focus,body:not(.login-mode) textarea:focus{outline:2px solid #e7a14e;outline-offset:1px}
+body:not(.login-mode) label{color:#724327;font-weight:750}
+body:not(.login-mode) .warning{background:#fff2d8;color:#86562f;border:1px solid #f0d29e}
+body:not(.login-mode) .status{color:#a65f30}
+body:not(.login-mode) .counts{gap:11px}
+body:not(.login-mode) .counts .card{position:relative;background:linear-gradient(150deg,#fffefa 40%,#fff0ce);border-color:#f6dbab;min-height:108px;overflow:hidden;padding:17px}
+body:not(.login-mode) .counts .card:nth-child(2){background:linear-gradient(150deg,#fffefa 40%,#ffe5cc)}
+body:not(.login-mode) .counts .card:nth-child(3){background:linear-gradient(150deg,#fffefa 40%,#fdeedc)}
+body:not(.login-mode) .counts .card:nth-child(4){background:linear-gradient(150deg,#fffefa 40%,#f8eac8)}
+body:not(.login-mode) .counts .card::after{content:"✦";position:absolute;right:14px;top:7px;color:#f2b04d99;font-size:29px}
+body:not(.login-mode) .counts .card h2{font-size:clamp(26px,6vw,34px);margin:9px 0 0;color:#a45722}
+body:not(.login-mode) .counts .card .hint{font-size:13px;font-weight:800;color:#906344}
+body:not(.login-mode) .order{padding:14px 12px;margin:8px 0;border:1px solid #f2dfc5;background:#fffcf5;border-radius:14px}
+body:not(.login-mode) .order .row>b{color:#793c1e}
+body:not(.login-mode) #bagelStats .card,body:not(.login-mode) #otherStats .card{border-left:5px solid #e7a34e}
+body:not(.login-mode) #menuList .card{border-left:5px solid #f3af64}
+body:not(.login-mode) #proposalList .card{border:1px solid #f3d4ab!important;border-left:5px solid #ed9c4b!important}
+body:not(.login-mode) #cloudRevenue{background:linear-gradient(135deg,#fff9e9,#ffeccf);border-color:#f4d7a3}
+body:not(.login-mode) .nav{background:#fffefaed;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:2px solid #f3d5ad;box-shadow:0 -6px 22px #a66b3022;display:flex;justify-content:space-evenly;padding:8px max(4px,calc((100vw - 780px)/2)) calc(8px + env(safe-area-inset-bottom));gap:3px;z-index:20}
+body:not(.login-mode) .nav button{background:transparent;border:none;box-shadow:none;color:#97643f;border-radius:12px;font-size:12px;line-height:1.2;padding:10px 5px;min-height:52px;min-width:0;flex:1}
+body:not(.login-mode) .nav button[aria-current=page]{background:linear-gradient(150deg,#ffefcc,#ffd29b);color:#7e3d13;box-shadow:inset 0 0 0 1px #f1c68e;font-weight:950}
+body:not(.login-mode) #printview .print-card{background:white;color:#222;box-shadow:none;border-radius:0}
+@media (min-width:650px){body:not(.login-mode) .wrap{padding:22px 20px 124px}body:not(.login-mode) .nav button{font-size:14px}}
+@media(max-width:390px){body:not(.login-mode)>header strong{font-size:18px}body:not(.login-mode) .nav button{font-size:11px;padding:9px 2px}body:not(.login-mode) .card{padding:14px}body:not(.login-mode) .wrap{padding:12px 10px 108px}}
+@media print{
+  body,body:not(.login-mode){background:white!important;color:#000!important;padding:0!important}
+  header,.nav{display:none!important}
+  body:not(.login-mode) .wrap{padding:0!important;max-width:none!important}
+  body:not(.login-mode) #printview .print-card{width:6cm!important;padding:3mm!important;border:1px dashed #555!important;font-size:10pt!important;font-weight:bold!important;break-inside:avoid;box-shadow:none!important;margin:2mm!important}
+  body:not(.login-mode) #printview h2{display:none!important}
+}
