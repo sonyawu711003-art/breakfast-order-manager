@@ -19,7 +19,7 @@ function normal(s){return String(s||'').normalize('NFKC').replace(/[＊✕✖]/g
 function canon(s){return normal(s).replace(/曼越梅|薑越莓/g,'蔓越莓').replace(/流金碳沙|流金碳砂|流金鹹沙|碳金流砂/g,'碳金流沙')}
 function dates(s,year){const out=[];for(const m of String(s).matchAll(dateRE)){const y=(m[0].match(/20\d{2}/)||[])[0]||String(year);const month=+m[1],day=+m[2];const d=new Date(+y,month-1,day);if(month<1||month>12||day<1||d.getMonth()!==month-1)continue;out.push({start:m.index,end:m.index+m[0].length,date:y+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0')})}return out}
 function itemMatches(s,extra){const names=[...new Set([...catalog,...(extra||[])])].filter(Boolean).sort((a,b)=>b.length-a.length);const hits=[];for(let i=0;i<s.length;i++){const name=names.find(n=>s.startsWith(n,i));if(!name)continue;hits.push({item:name,start:i,end:i+name.length});i+=name.length-1}return hits}
-function qtyAfter(fragment){const m=fragment.match(/^\s*(?:[×xX*+]\s*(\d{1,2})|(\d{1,2})\s*(?:個|顆|份|杯|組))/);return m?Number(m[1]||m[2]):1}
+function qtyAfter(fragment){const m=fragment.match(/^\s*(?:[×xX*+]\s*(\d{1,2})|(\d{1,2})\s*(?:個|顆|份|杯|組)?(?=\s*(?:[，,、+]|$|謝謝|不加|不要|加蛋|加厚蛋)))/);return m?Number(m[1]||m[2]):1}
 function parseLine(line,ctx){const s=canon(line);const ds=dates(s,ctx.year);if(!ds.length&&!ctx.defaultDate)return [];const hits=itemMatches(s,ctx.menu);if(!hits.length)return [];
 const result=[];for(let i=0;i<hits.length;i++){const hit=hits[i];let day=ctx.defaultDate||'';for(const d of ds){if(d.start<hit.start)day=d.date}
 const next=hits[i+1];const quantity=qtyAfter(s.slice(hit.end,next?.start||s.length));const flexible=/(?:任一|任一天|其中一天|擇一|隨便一天)/.test(s)&&ds.length>1; if(flexible)day='';
