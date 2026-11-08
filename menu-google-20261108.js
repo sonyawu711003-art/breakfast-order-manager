@@ -1,6 +1,6 @@
-/* Source: uploaded 吃早餐_Google商家菜單_2026-11-08(1).xlsx (62 items).
-   regular_price=一般售價; price=群友價. Null is unknown, never zero.
-   焙茶桂圓標記停用，因使用者先前明確改為鐵觀音桂圓。 */
+/* Source: uploaded Google Business menu Excel (62 items) plus 3 products from 2026-11-04 photos.
+ price = current member/offer price where known; regular_price = published standard price or null.
+ New-item photo prices are TRIAL prices, not assumed permanent prices. */
 window.BREAKFAST_GOOGLE_MENU_20261108=[
   {
     "category": "三明治",
@@ -496,6 +496,30 @@ window.BREAKFAST_GOOGLE_MENU_20261108=[
     "regular_price": 55,
     "price": 55,
     "description": "",
+    "active": true
+  },
+  {
+    "category": "歐式",
+    "name": "布里歐帕瑪森（手寫副名待確認）",
+    "price": 75,
+    "regular_price": null,
+    "description": "2026/11/04 照片新品試吃價 $75；手寫第二行品名待確認，一般正式售價未公布。",
+    "active": true
+  },
+  {
+    "category": "三明治",
+    "name": "明太子燻雞雞蛋三明治",
+    "price": 65,
+    "regular_price": null,
+    "description": "2026/11/04 照片新品試吃價 $65；一般正式售價未公布。",
+    "active": true
+  },
+  {
+    "category": "三明治",
+    "name": "法式燻菇培根起司三明治",
+    "price": 65,
+    "regular_price": null,
+    "description": "2026/11/04 照片新品試吃價 $65；一般正式售價未公布。",
     "active": true
   }
 ];
