@@ -46,9 +46,10 @@ function candidates(text,opts){
    const ds=window.BreakfastLineParser.dates(line,yy);
    if(ds.length===1)current=ds[0].date;
    const found=window.BreakfastLineParser.parseLine(line,{customer:msg.sender,year:yy,menu:names,defaultDate:current,sourceIndex:0,lineNo:msg.line*100+j});
-   for(const x of found){
+   for(let k=0;k<found.length;k++){
+    const x=found[k];
     x.notes=raw;x.messageDate=msg.posted;x.messageTime=msg.time;x.sourceLine=msg.line;
-    x.line=msg.line*1000+j*100+extracted.length;
+    x.line=msg.line*100000+j*1000+k;
     x.reviewRequired=Boolean(x.reviewRequired)||changeSignal.test(raw)||ds.length>1;
     x.reason=x.reviewRequired?(changeSignal.test(raw)?'包含改單／取消／追加語意，需對照既有訂單':x.reason||'日期或數量需要核對'):'';
     extracted.push(x);
