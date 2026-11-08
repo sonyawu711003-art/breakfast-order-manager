@@ -7,7 +7,7 @@
 <div id="content" class="hidden">
 <div class="card"><h2>① 選擇 LINE 截圖</h2><input id="images" type="file" multiple accept="image/png,image/jpeg,image/webp"><button id="scanBtn" onclick="scanImages()">辨識截圖</button><div id="scanMsg" class="status"></div><div id="thumbnails"></div></div>
 <div class="card"><h2>② 核對原始文字</h2><p class="hint">更推薦直接匯入 LINE 匯出的聊天紀錄 TXT，可保留原本的發言人與時間；若只有照片，仍可用上方 OCR。</p><label>LINE 聊天紀錄 TXT（可選）<input type="file" id="chatTxt" accept=".txt,text/plain"></label><div class="cols"><label>訊息起始日期<input id="txtFrom" type="date"></label><label>訊息起始時間<input id="txtFromTime" type="time" value="00:00" step="60"></label><label>訊息結束日期<input id="txtTo" type="date"></label><label>訊息結束時間<input id="txtToTime" type="time" value="23:59" step="60"></label></div><p class="hint">依 LINE 訊息「發送日期＋時間」篩選，非取餐日期。起迄時間都包含在內，適合分批補讀新訂單；重複訊息送審時仍會嘗試排除。</p><button class="alt" onclick="importChatTxt()">讀取 TXT 原始訊息</button><p class="hint">可貼上 LINE 匯出的文字，也可直接改正 OCR 內容。識別結果還不是正式訂單。</p><textarea rows="9" id="rawText" placeholder="可先選擇截圖辨識，或貼上 LINE 原始對話"></textarea><label>預設取餐日期（無法辨識時用）<input type="date" id="defaultDate"></label><button onclick="extractCandidates()">從文字產生候選單</button> <button class="alt" onclick="addCandidate()">手動新增一筆候選</button></div>
-<div class="card"><h2>③ 依客人＋取餐日整單確認</h2><p class="hint">客人可使用簡稱（例如「阿華田」），系統會對照正式菜單；「芋頭」可能指貝果或甜點，需先選正確品項。✅ <strong>品項小計＝數量 × 單價，系統自動計算</strong>，只有特殊折扣或組合優惠才需展開「特別總額」手動修改。</p><div id="candidates"></div><button id="send" onclick="sendToCloud()">送出勾選的候選單至共同審核</button><p id="sendMsg" class="status"></p></div>
+<div class="card"><h2>③ 依客人＋取餐日整單確認</h2><p class="hint">客人可使用簡稱（例如「阿華田」），系統會對照正式菜單；「芋頭」可能指貝果或甜點，需先選正確品項。✅ <strong>品項小計＝數量 × 單價，系統自動計算</strong>，只有特殊折扣或組合優惠才需展開「特別總額」手動修改。</p><div id="candidateValidation" class="card hidden" role="status" aria-live="polite"></div><div id="candidates"></div><button class="alt" type="button" onclick="showCandidateIssues(false)">🔎 檢查候選單缺漏</button> <button id="send" onclick="sendToCloud()">送出勾選的候選單至共同審核</button><p id="sendMsg" class="status"></p></div>
 </div></main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script><script src="./cloud-config.js"></script><script src="./line-parser-v2.js?v=20261109-awatara3"></script><script src="./line-txt-v3.js"></script>
 <script>
@@ -224,9 +224,59 @@ function drawCandidates(){
  });
  $('candidates').querySelectorAll('[data-remove]').forEach(n=>n.onclick=()=>{proposals.splice(Number(n.dataset.remove),1);drawCandidates()});
  $('sendMsg').textContent='共有 '+groups.length+' 組客人／日期、'+proposals.length+' 個品項，尚未更新正式訂單。';
+ const badAll=issueCandidates(false);if(badAll.length)$('sendMsg').textContent+=' ⚠️ 有 '+badAll.length+' 筆尚待補正，請點「檢查候選單缺漏」查看詳細原因。';
+}
+function candidateIssues(p){
+ const issues=[];
+ if(!String(p.customer||'').trim())issues.push('缺少客人姓名');
+ const date=String(p.date||'').trim();
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||Number.isNaN(new Date(date+'T12:00:00').getTime())||new Date(date+'T12:00:00').getFullYear()!==Number(date.slice(0,4))||new Date(date+'T12:00:00').getMonth()+1!==Number(date.slice(5,7))||new Date(date+'T12:00:00').getDate()!==Number(date.slice(8,10)))issues.push('缺少或無效的取餐日期');
+ if(!String(p.item||'').trim())issues.push('缺少品項');
+ if(p.catalogStatus==='ambiguous')issues.push('品名可能對應多款商品');
+ if(!Number.isInteger(p.qty)||p.qty<1||p.qty>999)issues.push('數量無效');
+ if(['edit','cancel'].includes(p.mode)&&!p.target)issues.push('修改／取消未選擇原訂單');
+ return issues;
+}
+function issueCandidates(checkedOnly=true){return proposals.flatMap((p,i)=>{if(checkedOnly&&!p.check)return [];const issues=candidateIssues(p);return issues.length?[{index:i,p,issues}]:[]})}
+function highlightCandidate(index){
+ const group=groupCandidateIndices().findIndex(g=>g.includes(index));
+ const card=document.querySelector('.order-group[data-group="'+group+'"]');
+ if(!card)return;
+ card.scrollIntoView({behavior:'smooth',block:'start'});
+ card.classList.add('needs-attention');
+ setTimeout(()=>card.classList.remove('needs-attention'),2200);
+ const input=card.querySelector('[data-i="'+index+'"][data-k="item"]');
+ if(input)input.focus({preventScroll:true});
+}
+function showCandidateIssues(checkedOnly=true){
+ const bad=issueCandidates(checkedOnly),panel=$('candidateValidation');
+ if(!bad.length){panel.classList.add('hidden');alert('目前'+(checkedOnly?'已勾選的':'所有')+'候選單資料完整，可以繼續核對後送審。');return false}
+ const msg=bad.slice(0,20).map(({index,p,issues})=>
+ '<li><button class="alt" type="button" data-issue-index="'+index+'">前往第 '+(index+1)+' 項</button>　<b>'+esc(p.customer||'姓名待確認')+'</b>｜'+esc(p.item||'品名待確認')+'｜'+esc(p.date||'日期未填')+'<div class="red">'+esc(issues.join('、'))+'</div></li>').join('');
+ panel.innerHTML='<h3>⚠️ '+bad.length+' 筆需要補正</h3>'+
+ '<p class="hint">系統已分開檢查姓名、取餐日、商品及處理方式；完整訂單可以保留勾選。請修正以下資料，或只保留完整的品項送審。</p>'+
+ '<ol class="issue-list">'+msg+(bad.length>20?'<li>其餘 '+(bad.length-20)+' 筆待補正</li>':'')+'</ol>'+
+ '<div class="row"><button type="button" class="alt" onclick="selectOnlyValidCandidates()">只勾選資料完整的品項</button><button type="button" class="alt" onclick="showCandidateIssues(false)">檢查所有候選單</button></div>';
+ panel.classList.remove('hidden');
+ panel.querySelectorAll('[data-issue-index]').forEach(b=>b.onclick=()=>highlightCandidate(Number(b.dataset.issueIndex)));
+ panel.scrollIntoView({behavior:'smooth',block:'start'});
+ return true;
+}
+function selectOnlyValidCandidates(){
+ const invalid=issueCandidates(true);
+ if(!invalid.length){showCandidateIssues(true);return}
+ if(!confirm('取消勾選 '+invalid.length+' 筆尚待補正資料，保留其他完整品項勾選？這不會刪除任何候選單。'))return;
+ invalid.forEach(x=>{proposals[x.index].check=false});
+ drawCandidates();
+ const panel=$('candidateValidation');
+ panel.classList.remove('hidden');
+ panel.innerHTML='<p>✅ 已取消勾選 '+invalid.length+' 筆待補正候選單，資料仍保留在畫面中。請核對其餘勾選品項後，再按「送出勾選的候選單」。</p><button class="alt" type="button" onclick="showCandidateIssues(false)">查看待補正品項</button>';
+ panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 async function sendToCloud(){
-const chosen=proposals.filter(p=>p.check);if(chosen.some(p=>p.catalogStatus==='ambiguous')){alert('部分簡稱對應多款商品，請先從「可能的正式商品」選好正確品項，再送審。');return}if(chosen.some(p=>!p.customer||!p.date)){alert('部分候選單尚無客人姓名或日期，請對照 LINE 截圖手動填妥，不能直接送審。');return}if(!chosen.length){alert('請先勾選並校正至少一筆候選單');return}
+ const chosen=proposals.filter(p=>p.check);
+ if(!chosen.length){alert('請先勾選並校正至少一筆候選單');return}
+ if(issueCandidates(true).length){showCandidateIssues(true);return}
 for(const p of chosen){
 if(!p.customer.trim()||!p.item.trim()||!p.date||!Number.isInteger(p.qty)||p.qty<1){alert('客人、日期、品項或數量未填妥');return}
 if(['edit','cancel'].includes(p.mode)&&!p.target){alert('修改／取消必須選擇原訂單');return}
