@@ -26,7 +26,7 @@ body.login-mode>.wrap{max-width:530px;padding:clamp(12px,3vw,24px);margin:0 auto
 .login-v2 .status{color:#b04c25;text-align:center;font-size:14px;min-height:14px}
 @media(max-width:370px){#loginCard.login-v2{padding:16px 15px}.login-duo{width:min(100%,240px)}.login-brand .wordmark{font-size:38px}}
 @media(prefers-reduced-motion:no-preference){.login-duo{animation:loginUp .45s ease-out both}@keyframes loginUp{from{transform:translateY(9px);opacity:.4}to{transform:translateY(0);opacity:1}}}
-</style></head><body class="login-mode">
+</style><link rel="stylesheet" href="./cloud-theme.css?v=20261108-joy1"></head><body class="login-mode">
 <header><div class="row"><strong>🥯 吃早餐｜雲端訂單</strong><span id="who">尚未登入</span></div><small>雙管理者｜相同權限｜共同資料庫</small></header>
 <div class="wrap">
 <div id="notConfigured" class="warning">⚙️ 雲端資料庫尚未完成設定。這個頁面已經具備登入與同步程式，但需要先建立 Supabase 專案、執行資料庫 SQL、加入兩位管理者，才會啟用正式訂單。<a href="./CLOUD_SETUP.md">查看設定說明</a></div>
@@ -83,7 +83,7 @@ if(!client)return;session=s;
 if(!s){document.body.classList.add('login-mode');$('passwordCard').classList.add('hidden');$('loginCard').classList.remove('hidden');$('main').classList.add('hidden');$('nav').classList.add('hidden');$('who').textContent='尚未登入';orders=[];if(subscription){client.removeChannel(subscription);subscription=null}if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null}return}
 const {data,error}=await client.from('admin_users').select('user_id,display_name').eq('user_id',s.user.id).maybeSingle();
 if(error||!data){document.body.classList.add('login-mode');$('loginMsg').textContent='這個帳號尚未取得吃早餐管理權限。請由資料庫管理者加入帳號。';$('main').classList.add('hidden');$('nav').classList.add('hidden');$('loginCard').classList.remove('hidden');return}
-document.body.classList.remove('login-mode');$('who').textContent=data.display_name;$('loginCard').classList.add('hidden');$('main').classList.remove('hidden');$('nav').classList.remove('hidden');await reload();
+document.body.classList.remove('login-mode');$('who').textContent=data.display_name;$('loginCard').classList.add('hidden');$('main').classList.remove('hidden');$('nav').classList.remove('hidden');tab('dashboard');await reload();
 if(!subscription)subscription=client.channel('breakfast-orders').on('postgres_changes',{event:'*',schema:'public',table:'breakfast_orders'},()=>reload()).subscribe();
 if(!refreshTimer)refreshTimer=setInterval(()=>{if(document.visibilityState==='visible')reload()},20000)
 }
@@ -92,7 +92,7 @@ function showPasswordSetup(){document.body.classList.remove('login-mode');$('pas
 $('newPasswordForm').addEventListener('submit',async e=>{e.preventDefault();if(!client)return;const p=$('newPassword').value;if(p.length<12||p!==$('confirmPassword').value){$('passwordMsg').textContent='兩次密碼不一致，或密碼少於 12 個字元';return}const {error}=await client.auth.updateUser({password:p});if(error){$('passwordMsg').textContent='設定失敗：'+error.message;return}$('passwordMsg').textContent='密碼設定成功';$('newPasswordForm').reset();$('passwordCard').classList.add('hidden');history.replaceState(null,'',location.pathname);const {data}=await client.auth.getSession();await setSession(data.session)});
 async function signOut(){if(client)await client.auth.signOut()}
 async function reload(){if(!session||!client)return;const {data,error}=await client.from('breakfast_orders').select('*').order('pickup_date',{ascending:true}).order('created_at',{ascending:true}).limit(5000);if(error){info('同步失敗：'+error.message);return}orders=data||[];info('✅ 已同步 '+orders.length+' 筆｜'+new Date().toLocaleTimeString('zh-TW'));draw()}
-function tab(name){document.querySelectorAll('.screen').forEach(e=>e.classList.toggle('hidden',e.id!==name));if(name==='printview')draw();if(name==='history')loadAudit()}
+function tab(name){document.querySelectorAll('.screen').forEach(e=>e.classList.toggle('hidden',e.id!==name));document.querySelectorAll('#nav button').forEach(b=>{const match=b.getAttribute('onclick')?.includes("tab('"+name+"')");if(match)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});if(name==='printview')draw();if(name==='history')loadAudit()}
 function draw(){
 const active=orders.filter(x=>x.status==='active'),sel=$('dateFilter'),v=sel.value;const dates=[...new Set(active.map(x=>x.pickup_date))].sort();sel.innerHTML='<option value="all">全部日期</option>'+dates.map(d=>'<option value="'+d+'">'+d+'</option>').join('');sel.value=dates.includes(v)?v:'all';
 const scoped=active.filter(x=>sel.value==='all'||x.pickup_date===sel.value),b=scoped.filter(x=>bagel(x.item)),other=scoped.filter(x=>!bagel(x.item));const n=a=>a.reduce((sum,x)=>sum+x.quantity,0);
