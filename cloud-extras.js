@@ -24,6 +24,7 @@ async function importGoogleMenu(){
  if(!confirm('確定匯入 Google 商家菜單與新品共 65 項？\n這會新增或更新菜單售價，但不會回溯修改任何已成立訂單。'))return;
  button.disabled=true;let added=0,updated=0,failed=0;const errors=[];
  const aliases={
+  '布里歐帕瑪森-奶油蒜香菲力雞':['布里歐帕瑪森（手寫副名待確認）'],
   '原味炙燒北海道明太子貝果':['原味明太子','原味炙燒明太子'],
   '巧克力藍莓乳酪貝果':['巧克力藍莓乳酪'],
   '牛奶芝麻奶霜貝果':['牛奶芝麻奶霜'],
