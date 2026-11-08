@@ -29,3 +29,12 @@ a{color:#a75322}
 .total-override{margin:9px 0 13px;background:#fff9ed;border:1px dashed #e7cba5;border-radius:13px;padding:10px 13px}
 .total-override summary{cursor:pointer;font-size:13px;font-weight:750;color:#95613d}
 .total-override[open] summary{margin-bottom:9px}
+
+/* Missing field review: show exactly which candidate needs attention. */
+#candidateValidation{border:2px solid #e8a05e;background:#fff8eb;box-shadow:0 6px 18px #b85d2921}
+#candidateValidation h3{margin-top:0;color:#963f21}
+#candidateValidation .issue-list{margin:10px 0;padding-left:24px;max-height:420px;overflow-y:auto}
+#candidateValidation .issue-list li{padding:9px 0;border-bottom:1px solid #efd8b8;line-height:1.7}
+#candidateValidation .issue-list button{min-height:38px;padding:7px 9px;font-size:12px}
+.order-group.needs-attention{border:3px solid #e9822a!important;box-shadow:0 0 0 6px #ffc36e55!important}
+@media(prefers-reduced-motion:reduce){.order-group.needs-attention{scroll-behavior:auto}}
