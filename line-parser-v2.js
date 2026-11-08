@@ -25,7 +25,10 @@ const result=[];for(let i=0;i<hits.length;i++){const hit=hits[i];let day=ctx.def
 const next=hits[i+1];const quantity=qtyAfter(s.slice(hit.end,next?.start||s.length));const flexible=/(?:任一|任一天|其中一天|擇一|隨便一天)/.test(s)&&ds.length>1; if(flexible)day='';
 const unknownMultipleDates=ds.length>1&&ds.every(d=>d.start<hit.start)&&!/(?:各|每[天日])/.test(s);if(unknownMultipleDates)day='';
 const uncertain=!ctx.customer||!day||!Number.isInteger(quantity)||quantity<1||quantity>50;
-result.push({customer:ctx.customer||'',date:day,item:hit.item,qty:quantity,notes:s,mode:/取消|退訂|不要了/.test(s)?'cancel':/改成|改期|改為|更改|換成|修改/.test(s)?'edit':'add',reviewRequired:uncertain||/取消|更改|改期|改成|改為|換成|追加|改訂/.test(s),reason:!ctx.customer?'無法確認發言者':flexible?'跨日期任選一天，需請客人確認':unknownMultipleDates?'多個日期未清楚分配品項':!day?'取餐日期不明':'需比對原訂單',sourceIndex:ctx.sourceIndex??0,line:ctx.lineNo??0})}return result}
+result.push({customer:ctx.customer||'',date:day,item:hit.item,qty:quantity,notes:s,mode:/取消|退訂|不要了/.test(s)?'cancel':/改成|改期|改為|更改|換成|修改/.test(s)?'edit':'add',reviewRequired:uncertain||/取消|更改|改期|改成|改為|換成|追加|改訂/.test(s),reason:!ctx.customer?'無法確認發言者':flexible?'跨日期任選一天，需請客人確認':unknownMultipleDates?'多個日期未清楚分配品項':!day?'取餐日期不明':'需比對原訂單',sourceIndex:ctx.sourceIndex??0,line:ctx.lineNo??0})}if(ds.length>1&&hits.length===1&&ds.every(d=>d.start<hits[0].start)&&/(?:各一|各1|各\s*1\s*(?:顆|個|份|杯)?)/.test(s)&&!/(?:任一|擇一|其中一天)/.test(s)){
+  return ds.map((d,i)=>({...result[0],date:d.date,line:ctx.lineNo*10+i,reviewRequired:true,reason:'多日期各一，請確認每一天各一筆'}))
+}
+return result}
 function parse(text,opts={}){const year=opts.year||new Date().getFullYear();const menu=opts.menu||[];let customer='',sourceIndex=0,date=opts.defaultDate||'',lineNo=0,skipping=false;const out=[],lines=String(text).split(/\r?\n/);
 for(let i=0;i<lines.length;i++){lineNo=i;const rawLine=lines[i];const parts=rawLine.split('\t');
 let lineInput=rawLine;
