@@ -34,7 +34,15 @@ if(parts.length>=3 && /^\s*(?:上午|下午)?\s*\d{1,2}:\d{2}/.test(parts[0])){
 }
 const s=canon(lineInput);if(!s)continue;const src=s.match(/^【截圖\s*(\d+)】/);if(src){sourceIndex=+src[1]-1;customer='';date=opts.defaultDate||'';skipping=false;continue}
 if(/吃早餐\s*[|｜]/.test(s)&&/口味|NEW|下週|預訂|限量/.test(s)){skipping=true;customer='';continue}
-if(skipping){if(/^已讀|^@|^以上收到/.test(s))skipping=false;continue}
+if(skipping){
+ const next=canon(lines[i+1]||''),third=canon(lines[i+2]||'');
+ const speaker=s.length<=25&&!dates(s,year).length&&!itemMatches(s,menu).length
+   &&((dates(next,year).length&&itemMatches(next,menu).length)
+   ||(dates(next,year).length&&itemMatches(third,menu).length));
+ if(speaker){skipping=false;customer=s;continue}
+ if(/^已讀|^@|^以上收到/.test(s))skipping=false;
+ continue
+}
 if(ignored.test(s)){if(/^(?:已讀|@|以上收到)/.test(s))customer='';continue}
 const nameHeader=s.match(/^(?:\d{1,2}:\d{2}\s*)?([^\d:：\s][^:：\n]{1,23})\s*[:：]\s*(.*)$/);
 if(nameHeader&&!itemMatches(nameHeader[1],menu).length){customer=nameHeader[1].trim();if(!nameHeader[2])continue;out.push(...parseLine(nameHeader[2],{year,menu,customer,sourceIndex,defaultDate:date,lineNo}));continue}
