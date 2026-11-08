@@ -48,7 +48,7 @@ function candidates(text,opts){
    const found=window.BreakfastLineParser.parseLine(line,{customer:msg.sender,year:yy,menu:names,defaultDate:current,sourceIndex:0,lineNo:msg.line*100+j});
    for(let k=0;k<found.length;k++){
     const x=found[k];
-    x.notes=raw;x.messageDate=msg.posted;x.messageTime=msg.time;x.sourceLine=msg.line;
+    x.notes=x.item==='田園沙拉'&&/任一|任選|任何一款/.test(raw)&&/雞肉沙拉/.test(raw)?'每份田園沙拉加購任一款雞肉（雞肉口味與加購價待確認）；原始訊息：'+raw:raw;x.messageDate=msg.posted;x.messageTime=msg.time;x.sourceLine=msg.line;
     x.line=msg.line*100000+j*1000+k;
     x.reviewRequired=Boolean(x.reviewRequired)||changeSignal.test(raw)||ds.length>1;
     x.reason=x.reviewRequired?(changeSignal.test(raw)?'包含改單／取消／追加語意，需對照既有訂單':x.reason||'日期或數量需要核對'):'';
