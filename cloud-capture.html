@@ -98,7 +98,7 @@ function addCandidate(){proposals.push(newCandidate({line:100000+proposals.lengt
 function targetOptions(value){return '<option value="">請選擇要更改／取消的原訂單</option>'+existing.map(o=>'<option value="'+o.id+'" '+(value===o.id?'selected':'')+'>'+esc(o.pickup_date+'｜'+o.customer+'｜'+o.item+' ×'+o.quantity)+'</option>').join('')}
 function groupCandidateIndices(){
  const groups=new Map();
- proposals.forEach((p,i)=>{const key=(p.customer||'').trim()+'\u001f'+(p.date||'');
+ proposals.forEach((p,i)=>{const key=(p.customer||'').trim()+'\u001f'+(p.date||'')+(!(p.customer||'').trim()||!p.date?'\u001f'+i:'');
  if(!groups.has(key))groups.set(key,[]);
  groups.get(key).push(i);
  });
@@ -130,7 +130,10 @@ function drawCandidates(){
  $('candidates').querySelectorAll('[data-i]').forEach(n=>n.addEventListener(n.type==='checkbox'?'change':'input',()=>{
    const p=proposals[Number(n.dataset.i)],k=n.dataset.k;
    p[k]=k==='check'?n.checked:k==='qty'?Number(n.value):n.value;
-   if(k==='price'||k==='qty'||k==='total'||k==='check')drawCandidates();
+   if(k==='check')drawCandidates();
+   else if(k==='price'||k==='qty'||k==='total'){
+     const group=n.closest('.order-group');if(group){const all=group.querySelectorAll('.order-line');const idx=[...all].indexOf(n.closest('.order-line'));const price=all[idx]?.querySelector('.hint');if(price)price.textContent='品項小計：'+(candidateAmount(p)===null?'未定價':money(candidateAmount(p)));const ids=groupCandidateIndices()[Number(group.dataset.group)];const amounts=ids.map(i=>candidateAmount(proposals[i]));const strong=group.querySelector('.order-summary strong');if(strong)strong.textContent='本單合計：'+(amounts.every(v=>v!==null)?money(amounts.reduce((a,b)=>a+b,0)):'部分品項未定價');}
+   }
  }));
  $('candidates').querySelectorAll('[data-group-check]').forEach(n=>n.onchange=()=>{
    groupCandidateIndices()[Number(n.dataset.groupCheck)].forEach(i=>{proposals[i].check=n.checked});
