@@ -20,7 +20,7 @@ const categories=['巧克力藍莓乳酪','南瓜焦糖乳酪','鐵觀音桂圓'
 const itemAliases={
  '咖啡核桃貝果':['咖啡核桃'],
  '抹茶開心果貝果':['抹茶開心果'],
- '大甲香芋貝果':['大甲芋頭','大甲香芋'],
+ '大甲香芋貝果':['大甲芋頭','大甲香芋','芋頭'],
  '原味炙燒北海道明太子貝果':['原味明太子','原味炙燒明太子'],
  '巧克力藍莓乳酪貝果':['巧克力藍莓','巧克力藍莓乳酪'],
  '南瓜焦糖乳酪貝果':['南瓜焦糖','南瓜焦糖乳酪'],
@@ -35,7 +35,7 @@ const itemAliases={
  '古早味紅茶':['紅茶','古早味紅茶'],
  '田園蔬果沙拉':['田園沙拉']
 };
-function itemKey(v){return String(v||'').normalize('NFKC').toLowerCase().replace(/\\s+/g,'').replace(/[・·．.、，,_－—-]/g,'').replace(/曼越梅|薑越莓/g,'蔓越莓').trim()}
+function itemKey(v){return String(v||'').normalize('NFKC').toLowerCase().replace(/\s+/g,'').replace(/[・·．.、，,_－—-]/g,'').replace(/曼越梅|薑越莓/g,'蔓越莓').trim()}
 function catalogCandidates(v){
  const key=itemKey(v);if(!key)return [];
  const active=menu.filter(m=>m.active!==false);
@@ -49,7 +49,9 @@ function catalogCandidates(v){
  if(hits.length)return hits;
  // Only consider a sufficiently distinctive prefix, and never select among multiple matches.
  if(key.length>=3)hits=byKeys(m=>itemKey(m.name).startsWith(key));
- return hits;
+ if(hits.length)return hits;
+ if(key.length>=2)return byKeys(m=>itemKey(m.name).includes(key));
+ return [];
 }
 function resolveItem(v){
  const matches=catalogCandidates(v);
@@ -61,6 +63,7 @@ function normalizeCandidateItem(p){
  const initial=p.item,found=resolveItem(initial);
  if(found.status==='matched'){
   p.item=found.record.name;p.price=catalogPrice(found.record);
+  p.flag=Boolean(p.baseFlag);if(!p.baseFlag)p.reason='';
   p.catalogStatus='matched';p.catalogHint=initial===p.item?'':'由「'+initial+'」對應正式菜單「'+p.item+'」';
  }else{
   p.catalogStatus=found.status;
@@ -144,7 +147,7 @@ if(currentSource==='txt'){
  const r=window.BreakfastLineTxt.candidates(raw,{fromDateTime,toDateTime,menu:menu.map(m=>m.name)});
  parsed=r.candidates;unresolved=r.unresolved;readCount=r.messagesRead;
 }else parsed=window.BreakfastLineParser.parse(raw,{year:new Date().getFullYear(),defaultDate:$('defaultDate').value,menu:menu.map(m=>m.name)});
-proposals=parsed.map(p=>{const candidate=newCandidate({customer:p.customer,date:p.date,item:p.item,qty:p.qty,price:'',notes:p.notes,mode:p.mode,sourceIndex:p.sourceIndex||0,line:p.line,flag:p.reviewRequired,reason:p.reason,sourceMessageDate:p.messageDate||'',sourceMessageTime:p.messageTime||''});normalizeCandidateItem(candidate);return candidate});
+proposals=parsed.map(p=>{const candidate=newCandidate({customer:p.customer,date:p.date,item:p.item,qty:p.qty,price:'',notes:p.notes,mode:p.mode,sourceIndex:p.sourceIndex||0,line:p.line,flag:p.reviewRequired,baseFlag:p.reviewRequired,reason:p.reason,sourceMessageDate:p.messageDate||'',sourceMessageTime:p.messageTime||''});normalizeCandidateItem(candidate);return candidate});
 unresolved.forEach(p=>proposals.push(newCandidate({customer:p.sender,date:'',notes:p.body,flag:true,reason:p.reason,mode:/取消|改|換/.test(p.body)?'edit':'add',line:p.line*1000,sourceMessageDate:p.posted,sourceMessageTime:p.time})));
 if(!proposals.length)proposals=[newCandidate({notes:currentSource==='txt'?'選定日期範圍內沒有辨識出候選訂單':raw.slice(0,500),flag:true,reason:'無法可靠判讀，請手動建立候選訂單',line:100000})];
 drawCandidates();
@@ -177,6 +180,7 @@ function drawCandidates(){
       '<div class="cols"><label>品名<input list="menuAutocomplete" autocomplete="off" data-i="'+i+'" data-k="item" value="'+esc(p.item)+'"></label><label>數量<input type="number" min="1" max="999" data-i="'+i+'" data-k="qty" value="'+p.qty+'"></label>'+
       '<label>單價<input type="number" min="0" step=".01" data-i="'+i+'" data-k="price" value="'+esc(p.price)+'"></label><label>手動小計（可留空）<input type="number" min="0" step=".01" data-i="'+i+'" data-k="total" value="'+esc(p.total)+'"></label></div>'+
       '<p class="hint" style="margin:7px 0;color:'+(p.catalogStatus==='matched'?'#6c7751':'#b25b2d')+'">'+(p.catalogHint?'📋 '+esc(p.catalogHint):'')+'</p>'+ 
+      (p.catalogStatus==='ambiguous'?'<label>可能的正式商品<select data-i="'+i+'" data-k="chooseItem"><option value="">請選擇正確商品</option>'+catalogCandidates(p.item).map(m=>'<option value="'+esc(m.name)+'">'+esc(m.name)+'（'+money(catalogPrice(m))+'）</option>').join('')+'</select></label>':'')+
       '<div class="row"><span class="hint">品項小計：'+(candidateAmount(p)===null?'未定價':money(candidateAmount(p)))+'</span><span class="hint">'+(p.flag?'⚠️ '+esc(p.reason||'需核對'):'待審核')+'</span></div>'+
       '<label>處理方式<select data-i="'+i+'" data-k="mode"><option value="add" '+(p.mode==='add'?'selected':'')+'>新增</option><option value="edit" '+(p.mode==='edit'?'selected':'')+'>修改原訂單</option><option value="cancel" '+(p.mode==='cancel'?'selected':'')+'>取消原訂單</option></select></label>'+
       '<label>修改／取消時選原訂單<select data-i="'+i+'" data-k="target">'+targetOptions(p.target)+'</select></label>'+
@@ -192,6 +196,10 @@ function drawCandidates(){
    else if(k==='price'||k==='qty'||k==='total'){
      const group=n.closest('.order-group');if(group){const all=group.querySelectorAll('.order-line');const idx=[...all].indexOf(n.closest('.order-line'));const price=all[idx]?.querySelector('.hint');if(price)price.textContent='品項小計：'+(candidateAmount(p)===null?'未定價':money(candidateAmount(p)));const ids=groupCandidateIndices()[Number(group.dataset.group)];const amounts=ids.map(i=>candidateAmount(proposals[i]));const strong=group.querySelector('.order-summary strong');if(strong)strong.textContent='本單合計：'+(amounts.every(v=>v!==null)?money(amounts.reduce((a,b)=>a+b,0)):'部分品項未定價');}
    }
+ }));
+ $('candidates').querySelectorAll('[data-i][data-k="chooseItem"]').forEach(n=>n.addEventListener('change',()=>{
+   if(!n.value)return;const p=proposals[Number(n.dataset.i)];
+   p.item=n.value;p.catalogHint='';normalizeCandidateItem(p);drawCandidates();
  }));
  $('candidates').querySelectorAll('[data-i][data-k="item"]').forEach(n=>n.addEventListener('change',()=>{
    const p=proposals[Number(n.dataset.i)];p.item=n.value.trim();p.catalogHint='';p.catalogStatus='';
