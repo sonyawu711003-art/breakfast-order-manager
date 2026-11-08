@@ -16,7 +16,7 @@ const catalog=[
 '抹茶開心果','原味明太子','紅茶','咖啡','沙拉'
 ].filter((x,i,a)=>a.indexOf(x)===i).sort((a,b)=>b.length-a.length);
 function normal(s){return String(s||'').normalize('NFKC').replace(/[＊✕✖]/g,'×').replace(/[＋]/g,'+').replace(/[，、]/g,'，').replace(/[ \t]+/g,' ').trim();}
-function canon(s){return normal(s).replace(/曼越梅|薑越莓/g,'蔓越莓').replace(/流金碳沙|流金鹹沙/g,'碳金流沙')}
+function canon(s){return normal(s).replace(/曼越梅|薑越莓/g,'蔓越莓').replace(/流金碳沙|流金碳砂|流金鹹沙|碳金流砂/g,'碳金流沙')}
 function dates(s,year){const out=[];for(const m of String(s).matchAll(dateRE)){const y=(m[0].match(/20\d{2}/)||[])[0]||String(year);const month=+m[1],day=+m[2];const d=new Date(+y,month-1,day);if(month<1||month>12||day<1||d.getMonth()!==month-1)continue;out.push({start:m.index,end:m.index+m[0].length,date:y+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0')})}return out}
 function itemMatches(s,extra){const names=[...new Set([...catalog,...(extra||[])])].filter(Boolean).sort((a,b)=>b.length-a.length);const hits=[];for(let i=0;i<s.length;i++){const name=names.find(n=>s.startsWith(n,i));if(!name)continue;hits.push({item:name,start:i,end:i+name.length});i+=name.length-1}return hits}
 function qtyAfter(fragment){const m=fragment.match(/^\s*(?:[×xX*+]\s*(\d{1,2})|(\d{1,2})\s*(?:個|顆|份|杯|組))/);return m?Number(m[1]||m[2]):1}
