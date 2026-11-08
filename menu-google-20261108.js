@@ -1,6 +1,7 @@
-/* Source: Google Business menu workbook (62) + three 2026-11-04 photo trial products.
- Photo handwritten name corrected by owner: 布里歐帕瑪森-奶油蒜香菲力雞 $75.
- price=trial/member known amount; regular_price=null if not published. */
+/* 吃早餐菜單基準：只有貝果與甜點可能有群友價。
+ * 其他分類 price = regular_price = 售價，且 UI 只顯示單一售價。
+ * 匯入本檔只更新菜單主檔；不修改歷史訂單。
+ */
 window.BREAKFAST_GOOGLE_MENU_20261108=[
   {
     "category": "三明治",
@@ -502,7 +503,7 @@ window.BREAKFAST_GOOGLE_MENU_20261108=[
     "category": "歐式",
     "name": "布里歐帕瑪森-奶油蒜香菲力雞",
     "price": 75,
-    "regular_price": null,
+    "regular_price": 75,
     "description": "奶油蒜香菲力雞布里歐帕瑪森；2026/11/04 新品試吃價 $75，正式一般售價尚未公布。",
     "active": true
   },
@@ -510,7 +511,7 @@ window.BREAKFAST_GOOGLE_MENU_20261108=[
     "category": "三明治",
     "name": "明太子燻雞雞蛋三明治",
     "price": 65,
-    "regular_price": null,
+    "regular_price": 65,
     "description": "2026/11/04 照片新品試吃價 $65；一般正式售價未公布。",
     "active": true
   },
@@ -518,7 +519,7 @@ window.BREAKFAST_GOOGLE_MENU_20261108=[
     "category": "三明治",
     "name": "法式燻菇培根起司三明治",
     "price": 65,
-    "regular_price": null,
+    "regular_price": 65,
     "description": "2026/11/04 照片新品試吃價 $65；一般正式售價未公布。",
     "active": true
   }
