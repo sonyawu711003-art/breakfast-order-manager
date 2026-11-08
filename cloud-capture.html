@@ -84,12 +84,13 @@ function extractCandidates(){
 const raw=$('rawText').value;if(!raw.trim()){alert('請先辨識或貼上文字');return}
 let parsed=[],unresolved=[],readCount=0;
 if(currentSource==='txt'){
+ if($('txtFrom').value&&$('txtTo').value&&$('txtFrom').value>$('txtTo').value){alert('訊息起始日期不能晚於結束日期');return}
  const r=window.BreakfastLineTxt.candidates(raw,{from:$('txtFrom').value,to:$('txtTo').value,menu:menu.map(m=>m.name)});
  parsed=r.candidates;unresolved=r.unresolved;readCount=r.messagesRead;
 }else parsed=window.BreakfastLineParser.parse(raw,{year:new Date().getFullYear(),defaultDate:$('defaultDate').value,menu:menu.map(m=>m.name)});
 proposals=parsed.map(p=>newCandidate({customer:p.customer,date:p.date,item:p.item,qty:p.qty,price:menu.find(m=>m.name===p.item)?.price??'',notes:p.notes,mode:p.mode,sourceIndex:p.sourceIndex||0,line:p.line,flag:p.reviewRequired,reason:p.reason,sourceMessageDate:p.messageDate||'',sourceMessageTime:p.messageTime||''}));
 unresolved.forEach(p=>proposals.push(newCandidate({customer:p.sender,date:'',notes:p.body,flag:true,reason:p.reason,mode:/取消|改|換/.test(p.body)?'edit':'add',line:p.line*1000,sourceMessageDate:p.posted,sourceMessageTime:p.time})));
-if(!proposals.length)proposals=[newCandidate({notes:raw.slice(0,500),flag:true,reason:'無法可靠判讀，請手動建立候選訂單',line:100000})];
+if(!proposals.length)proposals=[newCandidate({notes:currentSource==='txt'?'選定日期範圍內沒有辨識出候選訂單':raw.slice(0,500),flag:true,reason:'無法可靠判讀，請手動建立候選訂單',line:100000})];
 drawCandidates();
 if(currentSource==='txt')$('sendMsg').textContent='TXT 已解析：'+readCount+' 則訊息，產生 '+parsed.length+' 筆候選；另有 '+unresolved.length+' 則無法確定的訊息。都尚未更新正式訂單。';
 }
@@ -126,13 +127,13 @@ for(const p of chosen){
  const source=selectedFiles[p.sourceIndex]?fileHashes[p.sourceIndex]||await sha256(selectedFiles[p.sourceIndex]):null;
  const txtFingerprint=currentSource==='txt'? await hashText('line-txt-v3|'+p.customer+'|'+p.sourceMessageDate+'|'+p.sourceMessageTime+'|'+p.line+'|'+p.item+'|'+p.notes):null;
  const target=existing.find(x=>x.id===p.target);
- const rec={change_type:p.mode,target_order_id:p.mode==='add'?null:p.target||null,target_version:p.mode==='add'?null:target?.version||null,customer:p.customer.trim(),pickup_date:p.date,item:p.item.trim(),quantity:p.qty,price:p.price===''?null:Number(p.price),total_override:p.total===''?null:Number(p.total),notes:p.notes,ocr_text:$('rawText').value.slice(0,60000),screenshot_path:paths[p.sourceIndex]||null,source_hash:source?source+':'+p.line:txtFingerprint,submitted_by:user.id};
+ const rec={change_type:p.mode,target_order_id:p.mode==='add'?null:p.target||null,target_version:p.mode==='add'?null:target?.version||null,customer:p.customer.trim(),pickup_date:p.date,item:p.item.trim(),quantity:p.qty,price:p.price===''?null:Number(p.price),total_override:p.total===''?null:Number(p.total),notes:p.notes,ocr_text:(currentSource==='txt'?p.notes:$('rawText').value.slice(0,60000)),screenshot_path:paths[p.sourceIndex]||null,source_hash:source?source+':'+p.line:txtFingerprint,submitted_by:user.id};
  const {error}=await api.from('breakfast_proposals').insert(rec);
  if(error&&error.code==='23505'){continue}if(error)throw new Error('建立待審失敗：'+error.message);
  successes++;p.check=false;
 }
 $('sendMsg').textContent='✅ 已送出 '+successes+' 筆共同待審訂單。請返回雲端首頁點「審核」進行核准。';
-drawCandidates();
+drawCandidates();$('sendMsg').textContent='✅ 已送出 '+successes+' 筆新的共同待審資料（重複匯入會略過）。請回首頁「審核」確認。';
 }catch(e){$('sendMsg').textContent='部分資料可能已送出，請先回共同審核清單確認，避免重送。\n'+e.message}
 finally{button.disabled=false}
 }
