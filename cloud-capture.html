@@ -159,7 +159,7 @@ const chosen=proposals.filter(p=>p.check);if(chosen.some(p=>!p.customer||!p.date
 for(const p of chosen){
 if(!p.customer.trim()||!p.item.trim()||!p.date||!Number.isInteger(p.qty)||p.qty<1){alert('客人、日期、品項或數量未填妥');return}
 if(['edit','cancel'].includes(p.mode)&&!p.target){alert('修改／取消必須選擇原訂單');return}
-if(p.mode==='add'&&existing.some(o=>o.customer.trim()===p.customer.trim()&&o.pickup_date===p.date&&o.item.trim()===p.item.trim()&&o.quantity===p.qty)){alert('可能重複新增：'+p.customer+'｜'+p.item+'。請改用修改訂單或先核對。');return}
+if(p.mode==='add'&&existing.some(o=>o.customer.trim()===p.customer.trim()&&o.pickup_date===p.date&&o.item.trim()===p.item.trim()&&o.quantity===p.qty)){if(currentSource==='txt'&&/追加|再加|多加|再多/.test(p.notes)){if(!confirm('客人 '+p.customer+' 的 '+p.item+' 已有相同品項數量的訂單；此則訊息標示追加。確定另外新增，不覆蓋舊單嗎？'))return;}else{alert('可能重複新增：'+p.customer+'｜'+p.item+'。請先核對，若為追加請在原訊息／客製要求標記「追加」，再送審。');return}}
 }
 const button=$('send');button.disabled=true;$('sendMsg').textContent='正在存放私密截圖並建立共用待審資料…';
 try{
