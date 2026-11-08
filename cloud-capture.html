@@ -16,6 +16,58 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=v=>v==null?'未定價':'$'+Number(v).toFixed(0);
 const categories=['巧克力藍莓乳酪','南瓜焦糖乳酪','鐵觀音桂圓','松露鹽之花','蜂蜜燕麥','起司三重奏','原味明太子','大甲芋頭','南瓜焦糖','巧克力藍莓','三明治','帕瑪森','布里歐','漢堡','吐司','沙拉','紅茶','咖啡','奶茶','貝果'];
+/* 對照正式菜單：短名稱、別名只在唯一匹配時帶入售價。 */
+const itemAliases={
+ '咖啡核桃貝果':['咖啡核桃'],
+ '抹茶開心果貝果':['抹茶開心果'],
+ '大甲香芋貝果':['大甲芋頭','大甲香芋'],
+ '原味炙燒北海道明太子貝果':['原味明太子','原味炙燒明太子'],
+ '巧克力藍莓乳酪貝果':['巧克力藍莓','巧克力藍莓乳酪'],
+ '南瓜焦糖乳酪貝果':['南瓜焦糖','南瓜焦糖乳酪'],
+ '鐵觀音桂圓貝果':['鐵觀音桂圓'],
+ '松露鹽之花貝果':['松露鹽之花'],
+ '蜂蜜燕麥貝果':['蜂蜜燕麥'],
+ '巧克力阿華田貝果':['阿華田','巧克力阿華田'],
+ '抹茶卡士達貝果':['抹茶卡士達'],
+ '牛奶芝麻奶霜貝果':['牛奶芝麻奶霜'],
+ '白玉紅豆抹茶貝果':['白玉紅豆抹茶'],
+ '起司三重奏':['起司三重奏'],
+ '古早味紅茶':['紅茶','古早味紅茶'],
+ '田園蔬果沙拉':['田園沙拉']
+};
+function itemKey(v){return String(v||'').normalize('NFKC').toLowerCase().replace(/\\s+/g,'').replace(/[・·．.、，,_－—-]/g,'').replace(/曼越梅|薑越莓/g,'蔓越莓').trim()}
+function catalogCandidates(v){
+ const key=itemKey(v);if(!key)return [];
+ const active=menu.filter(m=>m.active!==false);
+ const byKeys=fn=>active.filter(fn);
+ let hits=byKeys(m=>itemKey(m.name)===key);
+ if(hits.length)return hits;
+ hits=byKeys(m=>(itemAliases[m.name]||[]).some(a=>itemKey(a)===key));
+ if(hits.length)return hits;
+ // A product omitted the category suffix ("貝果", "三明治" etc.).
+ hits=byKeys(m=>itemKey(m.name.replace(/(?:貝果|三明治|吐司|小漢堡|漢堡|沙拉|輕食堡)$/,''))===key);
+ if(hits.length)return hits;
+ // Only consider a sufficiently distinctive prefix, and never select among multiple matches.
+ if(key.length>=3)hits=byKeys(m=>itemKey(m.name).startsWith(key));
+ return hits;
+}
+function resolveItem(v){
+ const matches=catalogCandidates(v);
+ return matches.length===1?{status:'matched',record:matches[0]}:matches.length>1?{status:'ambiguous',matches}:{status:'unknown',matches:[]};
+}
+function catalogPrice(m){return m?.price??m?.regular_price??''}
+function normalizeCandidateItem(p){
+ if(!p.item)return;
+ const initial=p.item,found=resolveItem(initial);
+ if(found.status==='matched'){
+  p.item=found.record.name;p.price=catalogPrice(found.record);
+  p.catalogStatus='matched';p.catalogHint=initial===p.item?'':'由「'+initial+'」對應正式菜單「'+p.item+'」';
+ }else{
+  p.catalogStatus=found.status;
+  p.catalogHint=found.status==='ambiguous'?'「'+initial+'」可能是：'+found.matches.map(x=>x.name).join('、')+'；請選擇正式品名':'「'+initial+'」未能唯一對應菜單，請確認品項';
+  p.price='';p.flag=true;p.reason=p.catalogHint;
+ }
+}
 function localDate(v){const m=String(v).match(/(?:(20\d{2})[\/.-])?(\d{1,2})[\/.-](\d{1,2})/);if(!m)return null;const y=m[1]||new Date().getFullYear();const d=y+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0');return Number(m[2])<=12&&Number(m[3])<=31?d:null}
 async function init(){const cfg=window.BREAKFAST_CLOUD||{};
 if(!window.supabase?.createClient||!cfg.url||!cfg.publishableKey){$('access').textContent='雲端設定尚未完成';return}
@@ -92,7 +144,7 @@ if(currentSource==='txt'){
  const r=window.BreakfastLineTxt.candidates(raw,{fromDateTime,toDateTime,menu:menu.map(m=>m.name)});
  parsed=r.candidates;unresolved=r.unresolved;readCount=r.messagesRead;
 }else parsed=window.BreakfastLineParser.parse(raw,{year:new Date().getFullYear(),defaultDate:$('defaultDate').value,menu:menu.map(m=>m.name)});
-proposals=parsed.map(p=>newCandidate({customer:p.customer,date:p.date,item:p.item,qty:p.qty,price:menu.find(m=>m.name===p.item)?.price??'',notes:p.notes,mode:p.mode,sourceIndex:p.sourceIndex||0,line:p.line,flag:p.reviewRequired,reason:p.reason,sourceMessageDate:p.messageDate||'',sourceMessageTime:p.messageTime||''}));
+proposals=parsed.map(p=>{const candidate=newCandidate({customer:p.customer,date:p.date,item:p.item,qty:p.qty,price:'',notes:p.notes,mode:p.mode,sourceIndex:p.sourceIndex||0,line:p.line,flag:p.reviewRequired,reason:p.reason,sourceMessageDate:p.messageDate||'',sourceMessageTime:p.messageTime||''});normalizeCandidateItem(candidate);return candidate});
 unresolved.forEach(p=>proposals.push(newCandidate({customer:p.sender,date:'',notes:p.body,flag:true,reason:p.reason,mode:/取消|改|換/.test(p.body)?'edit':'add',line:p.line*1000,sourceMessageDate:p.posted,sourceMessageTime:p.time})));
 if(!proposals.length)proposals=[newCandidate({notes:currentSource==='txt'?'選定日期範圍內沒有辨識出候選訂單':raw.slice(0,500),flag:true,reason:'無法可靠判讀，請手動建立候選訂單',line:100000})];
 drawCandidates();
@@ -122,8 +174,9 @@ function drawCandidates(){
     '<div class="cols"><label>整單客人<input data-group-name="'+g+'" value="'+esc(first.customer)+'"></label><label>整單取餐日<input type="date" data-group-date="'+g+'" value="'+esc(first.date)+'"></label></div>'+
     '<div class="hint">本單品項明細：</div>'+
     ids.map(i=>{const p=proposals[i];return '<div class="order-line"><div class="row"><label><input type="checkbox" data-i="'+i+'" data-k="check" style="width:auto;display:inline" '+(p.check?'checked':'')+'> 品項 '+(ids.indexOf(i)+1)+'</label><button class="alt" data-remove="'+i+'">移除品項</button></div>'+
-      '<div class="cols"><label>品名<input data-i="'+i+'" data-k="item" value="'+esc(p.item)+'"></label><label>數量<input type="number" min="1" max="999" data-i="'+i+'" data-k="qty" value="'+p.qty+'"></label>'+
+      '<div class="cols"><label>品名<input list="menuAutocomplete" autocomplete="off" data-i="'+i+'" data-k="item" value="'+esc(p.item)+'"></label><label>數量<input type="number" min="1" max="999" data-i="'+i+'" data-k="qty" value="'+p.qty+'"></label>'+
       '<label>單價<input type="number" min="0" step=".01" data-i="'+i+'" data-k="price" value="'+esc(p.price)+'"></label><label>手動小計（可留空）<input type="number" min="0" step=".01" data-i="'+i+'" data-k="total" value="'+esc(p.total)+'"></label></div>'+
+      '<p class="hint" style="margin:7px 0;color:'+(p.catalogStatus==='matched'?'#6c7751':'#b25b2d')+'">'+(p.catalogHint?'📋 '+esc(p.catalogHint):'')+'</p>'+ 
       '<div class="row"><span class="hint">品項小計：'+(candidateAmount(p)===null?'未定價':money(candidateAmount(p)))+'</span><span class="hint">'+(p.flag?'⚠️ '+esc(p.reason||'需核對'):'待審核')+'</span></div>'+
       '<label>處理方式<select data-i="'+i+'" data-k="mode"><option value="add" '+(p.mode==='add'?'selected':'')+'>新增</option><option value="edit" '+(p.mode==='edit'?'selected':'')+'>修改原訂單</option><option value="cancel" '+(p.mode==='cancel'?'selected':'')+'>取消原訂單</option></select></label>'+
       '<label>修改／取消時選原訂單<select data-i="'+i+'" data-k="target">'+targetOptions(p.target)+'</select></label>'+
@@ -131,6 +184,7 @@ function drawCandidates(){
     '<div class="order-summary"><strong>本單合計：'+total+'</strong><p class="hint">已依客人與日期合併檢視；正式雲端仍逐品項保存以利統計。價格和客製內容請核對。</p></div>'+
     '<details><summary>本單原始訊息（去重）</summary>'+noteUnique.map(x=>'<p class="hint">'+esc(x)+'</p>').join('')+'</details></div>'
  }).join('')||'<p class="hint">尚無候選訂單</p>';
+ if(!document.getElementById('menuAutocomplete'))$('candidates').insertAdjacentHTML('beforeend','<datalist id="menuAutocomplete">'+menu.map(m=>'<option value="'+esc(m.name)+'"></option>').join('')+'</datalist>');
  $('candidates').querySelectorAll('[data-i]').forEach(n=>n.addEventListener(n.type==='checkbox'?'change':'input',()=>{
    const p=proposals[Number(n.dataset.i)],k=n.dataset.k;
    p[k]=k==='check'?n.checked:k==='qty'?Number(n.value):n.value;
@@ -138,6 +192,10 @@ function drawCandidates(){
    else if(k==='price'||k==='qty'||k==='total'){
      const group=n.closest('.order-group');if(group){const all=group.querySelectorAll('.order-line');const idx=[...all].indexOf(n.closest('.order-line'));const price=all[idx]?.querySelector('.hint');if(price)price.textContent='品項小計：'+(candidateAmount(p)===null?'未定價':money(candidateAmount(p)));const ids=groupCandidateIndices()[Number(group.dataset.group)];const amounts=ids.map(i=>candidateAmount(proposals[i]));const strong=group.querySelector('.order-summary strong');if(strong)strong.textContent='本單合計：'+(amounts.every(v=>v!==null)?money(amounts.reduce((a,b)=>a+b,0)):'部分品項未定價');}
    }
+ }));
+ $('candidates').querySelectorAll('[data-i][data-k="item"]').forEach(n=>n.addEventListener('change',()=>{
+   const p=proposals[Number(n.dataset.i)];p.item=n.value.trim();p.catalogHint='';p.catalogStatus='';
+   normalizeCandidateItem(p);drawCandidates();
  }));
  $('candidates').querySelectorAll('[data-group-check]').forEach(n=>n.onchange=()=>{
    groupCandidateIndices()[Number(n.dataset.groupCheck)].forEach(i=>{proposals[i].check=n.checked});
