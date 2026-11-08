@@ -25,7 +25,66 @@ function editMenu(id){const m=menuRows.find(x=>x.id===id);if(!m)return;tab('menu
 function drawMenu(){const q=document.getElementById('menuSearch').value.toLowerCase();document.getElementById('menuList').innerHTML=menuRows.filter(m=>(m.name+m.category).toLowerCase().includes(q)).map(m=>'<div class="card row"><span><b>'+htmlEscape(m.name)+'</b> <span class="hint">'+htmlEscape(m.category)+'</span><br>'+'群友 '+money(m.price)+'｜一般 '+money(m.regular_price)+(m.description?'<p class="hint">'+htmlEscape(m.description)+'</p>':'')+(m.active?'':'（停用）')+'</span><button class="secondary" data-m="'+m.id+'">修改</button></div>').join('')||'<p>尚無菜單資料</p>';document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>editMenu(b.dataset.m));
 const select=document.getElementById('menuChooser'),prev=select.value;select.innerHTML='<option value="">可挑選菜單或手動輸入品名</option>'+menuRows.filter(m=>m.active).map(m=>'<option value="'+m.id+'">'+htmlEscape(m.category)+'｜'+htmlEscape(m.name)+' 群友 '+money(m.price)+' / 一般 '+money(m.regular_price)+'</option>').join('');select.value=prev}
 async function refreshExtras(){if(!client||!session)return;const [a,b]=await Promise.all([client.from('breakfast_menu').select('*').order('category').order('name'),client.from('breakfast_proposals').select('*').order('submitted_at',{ascending:false}).limit(300)]);if(a.error||b.error){window.BREAKFAST_UPGRADE_READY=false;const msg=a.error?.message||b.error?.message;document.getElementById('proposalList').textContent='請先執行 Supabase 升級 SQL：'+msg;document.getElementById('menuList').textContent='菜單表尚未建立';return}window.BREAKFAST_UPGRADE_READY=true;menuRows=a.data||[];proposalRows=b.data||[];drawMenu();drawProposals();previewAmount()}
-function drawProposals(){const pending=proposalRows.filter(p=>p.status==='pending');document.getElementById('proposalList').innerHTML='<p class="hint">待審：'+pending.length+' 筆</p>'+pending.map(p=>'<div class="card"><div class="row"><b>'+htmlEscape(p.customer)+'</b><span>'+htmlEscape(p.pickup_date)+' '+htmlEscape(p.change_type)+'</span></div><p>'+htmlEscape(p.item)+' ×'+p.quantity+'｜'+money(p.total_override!==null?p.total_override:p.price===null?null:p.price*p.quantity)+'</p><p class="note">'+htmlEscape(p.notes)+'</p><details><summary>原始文字</summary><pre style="white-space:pre-wrap">'+htmlEscape(p.ocr_text)+'</pre></details><div class="row"><button class="secondary" data-image="'+p.id+'" '+(p.screenshot_path?'':'disabled')+'>查看截圖</button><button data-review="'+p.id+'" data-decision="approve">核准</button><button class="secondary" data-review="'+p.id+'" data-decision="reject">退回</button></div></div>').join('')||'<p>沒有待審核訂單</p>';document.querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>reviewProposal(b.dataset.review,b.dataset.decision));document.querySelectorAll('[data-image]').forEach(b=>b.onclick=()=>openShot(b.dataset.image))}
+function groupPendingProposals(){
+ const groups=new Map();
+ for(const p of proposalRows.filter(p=>p.status==='pending')){
+  const key=p.customer.trim()+'\u001f'+p.pickup_date;
+  if(!groups.has(key))groups.set(key,[]);
+  groups.get(key).push(p);
+ }
+ return [...groups.values()];
+}
+function pendingAmount(p){return p.total_override!=null?Number(p.total_override):p.price!=null?Number(p.price)*p.quantity:null}
+function drawProposals(){
+ const grouped=groupPendingProposals(),pending=grouped.reduce((sum,ps)=>sum+ps.length,0);
+ document.getElementById('proposalList').innerHTML=
+ '<p class="hint">待審：'+grouped.length+' 組客人／取餐日，共 '+pending+' 個品項</p>'+
+ grouped.map((ps,g)=>{
+ const first=ps[0],totals=ps.map(pendingAmount),complete=totals.every(t=>t!==null);
+ const total=complete?money(totals.reduce((sum,n)=>sum+n,0)):'部分品項尚未定價';
+ const originalTexts=[...new Set(ps.map(p=>p.ocr_text).filter(Boolean))];
+ return '<div class="card" style="border:1px solid #c5dfce">'+
+   '<div class="row"><b>🧾 '+htmlEscape(first.customer)+'</b><b>'+htmlEscape(first.pickup_date)+'</b></div>'+
+   '<p class="hint">同客人同日期，共 '+ps.length+' 個待審品項</p>'+
+   ps.map(p=>'<div style="border-top:1px solid #e0e9e2;padding:9px 0">'+
+    '<div class="row"><span><b>'+htmlEscape(p.item)+'</b> ×'+p.quantity+'</span><span>'+money(pendingAmount(p))+'</span></div>'+
+    '<div class="hint">處理：'+htmlEscape(p.change_type)+'</div>'+
+    '<p class="note">'+htmlEscape(p.notes)+'</p>'+
+    '<div class="row"><button class="secondary" data-image="'+p.id+'" '+(p.screenshot_path?'':'disabled')+'>查看截圖</button>'+
+    '<button class="secondary" data-review="'+p.id+'" data-decision="approve">單項核准</button>'+
+    '<button class="secondary" data-review="'+p.id+'" data-decision="reject">單項退回</button></div></div>').join('')+
+   '<p><b>整單合計：'+total+'</b></p>'+
+   '<details><summary>原始文字（去重）</summary>'+originalTexts.map(t=>'<pre style="white-space:pre-wrap">'+htmlEscape(t)+'</pre>').join('')+'</details>'+
+   '<div class="row"><button data-review-group="'+g+'" data-group-decision="approve">整單核准</button>'+
+   '<button class="secondary" data-review-group="'+g+'" data-group-decision="reject">整單退回</button></div></div>';
+ }).join('')||'<p>沒有待審核訂單</p>';
+ document.querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>reviewProposal(b.dataset.review,b.dataset.decision));
+ document.querySelectorAll('[data-image]').forEach(b=>b.onclick=()=>openShot(b.dataset.image));
+ document.querySelectorAll('[data-review-group]').forEach(b=>b.onclick=()=>reviewProposalGroup(Number(b.dataset.reviewGroup),b.dataset.groupDecision));
+}
+async function reviewProposalGroup(index,decision){
+ const ps=groupPendingProposals()[index];if(!ps||!ps.length)return;
+ const group=ps[0].customer+'｜'+ps[0].pickup_date;
+ let note='';
+ if(decision==='approve'){
+  if(!confirm('確定核准 '+group+' 共 '+ps.length+' 個品項？\n將逐品項更新正式訂單。請確認所有品名、數量及客製備註。'))return;
+ }else{
+  const v=prompt('整單退回原因（可留空）','');if(v===null)return;note=v;
+ }
+ document.querySelectorAll('[data-review-group],[data-review]').forEach(b=>b.disabled=true);
+ let done=0;let failure='';
+ try{
+  for(const p of ps){
+   const {error}=await client.rpc('breakfast_review_proposal',{proposal_id:p.id,decision,note});
+   if(error){failure=error.message;break}
+   done++;
+  }
+  await reload();await refreshExtras();
+  if(failure)alert('整單處理未全部完成：已處理 '+done+'/'+ps.length+' 項。\n'+failure+'\n請重新整理並確認剩餘待審品項，避免重複核准。');
+ }finally{
+  document.querySelectorAll('[data-review-group],[data-review]').forEach(b=>b.disabled=false);
+ }
+}
 async function openShot(id){const p=proposalRows.find(x=>x.id===id);if(!p||!p.screenshot_path)return;const {data,error}=await client.storage.from('breakfast-line-shots').createSignedUrl(p.screenshot_path,120);if(error){alert(error.message);return}window.open(data.signedUrl,'_blank','noopener')}
 async function reviewProposal(id,decision){const p=proposalRows.find(x=>x.id===id);if(!p)return;let note='';if(decision==='approve'){if(!confirm('確定核准 '+p.customer+'｜'+p.item+' ×'+p.quantity+'？將更新正式訂單。'))return}else{const v=prompt('退回原因（可留空）','');if(v===null)return;note=v}
 const {error}=await client.rpc('breakfast_review_proposal',{proposal_id:id,decision,note});if(error){alert('審核失敗：'+error.message);return}await reload();await refreshExtras()}
