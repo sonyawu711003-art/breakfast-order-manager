@@ -74,6 +74,7 @@ function normalizeCandidateItem(p){
   p.price='';p.flag=true;p.reason=p.catalogHint;
  }
 }
+function recognitionNames(){return [...new Set([...menu.map(m=>m.name),...Object.values(itemAliases).flat(),'芋頭'])]}
 function localDate(v){const m=String(v).match(/(?:(20\d{2})[\/.-])?(\d{1,2})[\/.-](\d{1,2})/);if(!m)return null;const y=m[1]||new Date().getFullYear();const d=y+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0');return Number(m[2])<=12&&Number(m[3])<=31?d:null}
 async function init(){const cfg=window.BREAKFAST_CLOUD||{};
 if(!window.supabase?.createClient||!cfg.url||!cfg.publishableKey){$('access').textContent='雲端設定尚未完成';return}
@@ -147,9 +148,9 @@ if(currentSource==='txt'){
  if(!from||!to){alert('請輸入完整的訊息起始與結束日期');return}
  const fromDateTime=from+'T'+fromTime,toDateTime=to+'T'+toTime;
  if(fromDateTime>toDateTime){alert('訊息起始日期／時間不能晚於結束日期／時間');return}
- const r=window.BreakfastLineTxt.candidates(raw,{fromDateTime,toDateTime,menu:menu.map(m=>m.name)});
+ const r=window.BreakfastLineTxt.candidates(raw,{fromDateTime,toDateTime,menu:recognitionNames()});
  parsed=r.candidates;unresolved=r.unresolved;readCount=r.messagesRead;
-}else parsed=window.BreakfastLineParser.parse(raw,{year:new Date().getFullYear(),defaultDate:$('defaultDate').value,menu:menu.map(m=>m.name)});
+}else parsed=window.BreakfastLineParser.parse(raw,{year:new Date().getFullYear(),defaultDate:$('defaultDate').value,menu:recognitionNames()});
 proposals=parsed.map(p=>{const candidate=newCandidate({customer:p.customer,date:p.date,item:p.item,qty:p.qty,price:'',notes:p.notes,mode:p.mode,sourceIndex:p.sourceIndex||0,line:p.line,flag:p.reviewRequired,baseFlag:p.reviewRequired,reason:p.reason,sourceMessageDate:p.messageDate||'',sourceMessageTime:p.messageTime||''});normalizeCandidateItem(candidate);return candidate});
 unresolved.forEach(p=>proposals.push(newCandidate({customer:p.sender,date:'',notes:p.body,flag:true,reason:p.reason,mode:/取消|改|換/.test(p.body)?'edit':'add',line:p.line*1000,sourceMessageDate:p.posted,sourceMessageTime:p.time})));
 if(!proposals.length)proposals=[newCandidate({notes:currentSource==='txt'?'選定日期範圍內沒有辨識出候選訂單':raw.slice(0,500),flag:true,reason:'無法可靠判讀，請手動建立候選訂單',line:100000})];
