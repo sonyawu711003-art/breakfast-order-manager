@@ -1,9 +1,47 @@
 <!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>吃早餐｜雙管理者雲端</title><style>
-*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif;background:#f4f8f5;color:#234a3d;padding-bottom:85px}header{background:#23594a;color:#fff;padding:19px}header strong{font-size:21px}.wrap{max-width:740px;margin:auto;padding:15px}.card{background:#fff;padding:16px;border:1px solid #dfebe2;border-radius:14px;margin-bottom:13px}.hint{color:#6e8275;font-size:13px}.warning{background:#fff0d7;border-radius:10px;padding:12px;font-size:13px}input,textarea,select{display:block;width:100%;font-size:16px;padding:11px;margin:7px 0 13px;border:1px solid #bdcfc3;border-radius:9px}button{background:#265b4c;border:0;color:white;font-weight:600;border-radius:9px;padding:12px;font-size:14px}button.secondary{background:#eef5f0;color:#275a4c;border:1px solid #c4d8cb}button:disabled{opacity:.45}h2{font-size:19px}h3{font-size:16px;margin-bottom:9px}.row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.counts{display:grid;grid-template-columns:1fr 1fr;gap:8px}.counts .card{margin:0}small{color:#9abcae}.nav{position:fixed;bottom:0;left:0;right:0;background:#fff;display:flex;border-top:1px solid #d4e0d9;padding-bottom:env(safe-area-inset-bottom)}.nav button{flex:1;background:#fff;color:#245948;padding:17px 3px;border-radius:0}.hidden{display:none!important}.order{border-bottom:1px solid #e9efeb;padding:10px 0}.note{color:#aa5b36;font-size:13px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.print-card{width:6cm;border:1px dashed #666;display:inline-block;vertical-align:top;break-inside:avoid;margin:2mm;padding:3mm;font-size:10pt;font-weight:bold}.print-card div{margin-bottom:3px}.print-card .detail{font-size:10pt}.no-scroll{white-space:nowrap}a{color:#306e58}.status{font-size:13px;color:#99613b}@media print{@page{size:A4;margin:5mm}body{background:#fff;padding:0}header,.nav,.wrap>*:not(#printview),#printview .no-print{display:none!important}.wrap{padding:0;max-width:none}#printview{display:block!important}#printview .print-card{font-size:10pt}}</style></head><body>
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif;background:#f4f8f5;color:#234a3d;padding-bottom:85px}header{background:#23594a;color:#fff;padding:19px}header strong{font-size:21px}.wrap{max-width:740px;margin:auto;padding:15px}.card{background:#fff;padding:16px;border:1px solid #dfebe2;border-radius:14px;margin-bottom:13px}.hint{color:#6e8275;font-size:13px}.warning{background:#fff0d7;border-radius:10px;padding:12px;font-size:13px}input,textarea,select{display:block;width:100%;font-size:16px;padding:11px;margin:7px 0 13px;border:1px solid #bdcfc3;border-radius:9px}button{background:#265b4c;border:0;color:white;font-weight:600;border-radius:9px;padding:12px;font-size:14px}button.secondary{background:#eef5f0;color:#275a4c;border:1px solid #c4d8cb}button:disabled{opacity:.45}h2{font-size:19px}h3{font-size:16px;margin-bottom:9px}.row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.counts{display:grid;grid-template-columns:1fr 1fr;gap:8px}.counts .card{margin:0}small{color:#9abcae}.nav{position:fixed;bottom:0;left:0;right:0;background:#fff;display:flex;border-top:1px solid #d4e0d9;padding-bottom:env(safe-area-inset-bottom)}.nav button{flex:1;background:#fff;color:#245948;padding:17px 3px;border-radius:0}.hidden{display:none!important}.order{border-bottom:1px solid #e9efeb;padding:10px 0}.note{color:#aa5b36;font-size:13px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.print-card{width:6cm;border:1px dashed #666;display:inline-block;vertical-align:top;break-inside:avoid;margin:2mm;padding:3mm;font-size:10pt;font-weight:bold}.print-card div{margin-bottom:3px}.print-card .detail{font-size:10pt}.no-scroll{white-space:nowrap}a{color:#306e58}.status{font-size:13px;color:#99613b}@media print{@page{size:A4;margin:5mm}body{background:#fff;padding:0}header,.nav,.wrap>*:not(#printview),#printview .no-print{display:none!important}.wrap{padding:0;max-width:none}#printview{display:block!important}#printview .print-card{font-size:10pt}}
+/* Bright youthful double-admin login: styling only; authentication remains Supabase Auth. */
+body.login-mode{background:radial-gradient(circle at 50% 8%,#fff9d8 0,#ffecd0 36%,#ffe0b1 68%,#fff6e8 100%);color:#59301e;padding:0;min-height:100dvh}
+body.login-mode>header{display:none}
+body.login-mode>.wrap{max-width:530px;padding:clamp(12px,3vw,24px);margin:0 auto}
+#loginCard.login-v2{background:rgba(255,255,255,.93);border:1px solid rgba(255,255,255,.9);box-shadow:0 18px 60px #ad622c2d;border-radius:28px;padding:24px clamp(17px,4vw,30px) 28px;overflow:hidden}
+.login-brand{text-align:center;margin:-12px 0 13px}
+.login-brand .wordmark{font-weight:1000;color:#643016;font-size:clamp(37px,10vw,54px);line-height:1.15;letter-spacing:.06em;-webkit-text-stroke:1px #fff;text-shadow:2px 3px 0 #ffd27e,0 3px 14px #f5a94948}
+.login-brand .english{display:inline-block;background:linear-gradient(90deg,#9c4c24,#c16f33);color:#fff;font-weight:800;font-size:12px;letter-spacing:.05em;border-radius:99px;padding:6px 16px;margin-top:5px}
+.login-brand .subtitle{font-size:15px;font-weight:850;color:#7e4824;margin:12px 0 7px}
+.login-duo{display:block;width:min(100%,276px);height:auto;margin:0 auto 8px;border-radius:23px;background:#fff6dc;box-shadow:0 9px 22px #b16c372a;border:4px solid white}
+.login-title{font-size:24px;margin:8px 0 4px;text-align:center;letter-spacing:.06em;color:#663616}
+.login-values{text-align:center;margin:0 0 20px;color:#995f3b;font-size:13px;font-weight:750;line-height:1.7}
+.login-v2 form label{display:block;color:#78482e;font-size:14px;font-weight:750;margin:8px 0}
+.login-v2 input{background:#fffbf5;border:1.5px solid #e8c9a9;border-radius:14px;min-height:51px;padding:13px 15px;color:#4d2a1c;font-size:16px;outline:none}
+.login-v2 input:focus{border-color:#df8834;box-shadow:0 0 0 3px #ffc97544}
+.login-v2 #signIn{width:100%;min-height:54px;border-radius:16px;background:linear-gradient(105deg,#fc982d,#dc6a13);font-size:17px;font-weight:900;letter-spacing:.04em;box-shadow:0 6px 15px #d7772947}
+.login-v2 #signIn:active{transform:scale(.99)}
+.login-v2 .password-row{position:relative}
+.login-v2 .password-row input{padding-right:76px}
+.login-v2 .show-password{position:absolute;right:9px;top:14px;padding:7px 10px;font-size:12px;border-radius:8px;background:#ffeed6;color:#89512d}
+.login-v2 .login-help{text-align:center;margin:16px 0 6px}
+.login-v2 .login-help a{color:#8f5027;font-weight:750}
+.login-v2 .privacy-note{text-align:center;color:#825f49;background:#fff2db;padding:10px 12px;border-radius:14px;font-size:12px;margin:14px 0 0}
+.login-v2 .status{color:#b04c25;text-align:center;font-size:14px;min-height:14px}
+@media(max-width:370px){#loginCard.login-v2{padding:16px 15px}.login-duo{width:min(100%,240px)}.login-brand .wordmark{font-size:38px}}
+@media(prefers-reduced-motion:no-preference){.login-duo{animation:loginUp .45s ease-out both}@keyframes loginUp{from{transform:translateY(9px);opacity:.4}to{transform:translateY(0);opacity:1}}}
+</style></head><body class="login-mode">
 <header><div class="row"><strong>🥯 吃早餐｜雲端訂單</strong><span id="who">尚未登入</span></div><small>雙管理者｜相同權限｜共同資料庫</small></header>
 <div class="wrap">
 <div id="notConfigured" class="warning">⚙️ 雲端資料庫尚未完成設定。這個頁面已經具備登入與同步程式，但需要先建立 Supabase 專案、執行資料庫 SQL、加入兩位管理者，才會啟用正式訂單。<a href="./CLOUD_SETUP.md">查看設定說明</a></div>
-<div id="loginCard" class="card"><h2>🔐 管理者登入</h2><p class="hint">只有經資料庫授權的兩個帳號，才可存取正式訂單。每個人使用自己的帳號和密碼。</p><form id="loginForm"><label>電子郵件<input type="email" id="email" autocomplete="username" required></label><label>密碼<input type="password" id="password" autocomplete="current-password" required></label><button type="submit" id="signIn">登入共同訂單</button></form><p id="loginMsg" class="status"></p><p><a href="./reset-password.html">尚未設定密碼／忘記密碼？點這裡</a></p></div>
+<div id="loginCard" class="card login-v2">
+<div class="login-brand"><div class="wordmark">🍞 吃早餐</div><div class="english">Breakfast &amp; Dessert Studio</div><div class="subtitle">吃早餐｜雲端訂單</div></div>
+<img class="login-duo" alt="A 管理者為女生、B 管理者為男生的 Q 版雙人插畫" src="./assets/admin-duo-q.svg" width="276" height="276" loading="eager" decoding="async">
+<h2 class="login-title">✨ 雙管理者共同登入</h2>
+<p class="login-values">👩 管理者 A　×　👨 管理者 B<br>相同權限｜共同審核｜雲端同步</p>
+<form id="loginForm">
+<label for="email">電子郵件<input type="email" id="email" autocomplete="username" inputmode="email" placeholder="請輸入管理者電子郵件" required></label>
+<label for="password">密碼</label><div class="password-row"><input type="password" id="password" autocomplete="current-password" placeholder="請輸入登入密碼" required><button type="button" class="show-password" id="togglePassword" aria-label="顯示密碼" aria-pressed="false">顯示</button></div>
+<button type="submit" id="signIn">☁ 登入共同訂單　›</button>
+</form><p id="loginMsg" class="status" role="status" aria-live="polite"></p>
+<p class="login-help"><a href="./reset-password.html">忘記密碼／首次設定密碼？</a></p>
+<p class="privacy-note">🔒 兩位管理者使用自己的帳號登入，共用同一份雲端資料</p></div>
 <div id="passwordCard" class="card hidden"><h2>🔑 完成帳號啟用／設定新密碼</h2><p class="hint">從 Supabase 邀請信或密碼重設信進入時，請為自己的管理者帳號設定密碼（至少 12 個字元）。</p><form id="newPasswordForm"><label>新密碼<input id="newPassword" type="password" autocomplete="new-password" minlength="12" required></label><label>再次輸入新密碼<input id="confirmPassword" type="password" autocomplete="new-password" minlength="12" required></label><button type="submit">設定新密碼</button></form><p id="passwordMsg" class="status"></p></div><div id="main" class="hidden">
 <div class="card row"><b id="syncStatus">正在連接雲端…</b><div><button class="secondary" onclick="reload()">同步資料</button> <button class="secondary" onclick="signOut()">登出</button></div></div>
 <div id="dashboard" class="screen"><h2>📊 製作統計</h2><label>取餐日期<select id="dateFilter" onchange="draw()"></select></label><div class="counts" id="cards"></div><h3>貝果口味</h3><div id="bagelStats"></div><h3>其他餐點</h3><div id="otherStats"></div></div>
@@ -17,6 +55,7 @@
 <script>
 let client=null,session=null,orders=[],subscription=null,refreshTimer=null;
 const $=x=>document.getElementById(x);
+$('togglePassword').addEventListener('click',()=>{const input=$('password');const visible=input.type==='password';input.type=visible?'text':'password';$('togglePassword').textContent=visible?'隱藏':'顯示';$('togglePassword').setAttribute('aria-pressed',String(visible));$('togglePassword').setAttribute('aria-label',visible?'隱藏密碼':'顯示密碼')});
 const htmlEscape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const B=/貝果|蜂蜜燕麥|松露鹽之花|鐵觀音桂圓|起司三重奏|巧克力藍莓|南瓜焦糖|大甲芋頭|原味明太子/;
 const bagel=s=>B.test(s)&&!/三明治|吐司|漢堡/.test(s);
@@ -41,15 +80,15 @@ if(setupRequested&&data.session){session=data.session;showPasswordSetup()}else a
 }
 async function setSession(s){
 if(!client)return;session=s;
-if(!s){$('passwordCard').classList.add('hidden');$('loginCard').classList.remove('hidden');$('main').classList.add('hidden');$('nav').classList.add('hidden');$('who').textContent='尚未登入';orders=[];if(subscription){client.removeChannel(subscription);subscription=null}if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null}return}
+if(!s){document.body.classList.add('login-mode');$('passwordCard').classList.add('hidden');$('loginCard').classList.remove('hidden');$('main').classList.add('hidden');$('nav').classList.add('hidden');$('who').textContent='尚未登入';orders=[];if(subscription){client.removeChannel(subscription);subscription=null}if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null}return}
 const {data,error}=await client.from('admin_users').select('user_id,display_name').eq('user_id',s.user.id).maybeSingle();
-if(error||!data){$('loginMsg').textContent='這個帳號尚未取得吃早餐管理權限。請由資料庫管理者加入帳號。';$('main').classList.add('hidden');$('nav').classList.add('hidden');$('loginCard').classList.remove('hidden');return}
-$('who').textContent=data.display_name;$('loginCard').classList.add('hidden');$('main').classList.remove('hidden');$('nav').classList.remove('hidden');await reload();
+if(error||!data){document.body.classList.add('login-mode');$('loginMsg').textContent='這個帳號尚未取得吃早餐管理權限。請由資料庫管理者加入帳號。';$('main').classList.add('hidden');$('nav').classList.add('hidden');$('loginCard').classList.remove('hidden');return}
+document.body.classList.remove('login-mode');$('who').textContent=data.display_name;$('loginCard').classList.add('hidden');$('main').classList.remove('hidden');$('nav').classList.remove('hidden');await reload();
 if(!subscription)subscription=client.channel('breakfast-orders').on('postgres_changes',{event:'*',schema:'public',table:'breakfast_orders'},()=>reload()).subscribe();
 if(!refreshTimer)refreshTimer=setInterval(()=>{if(document.visibilityState==='visible')reload()},20000)
 }
 $('loginForm').addEventListener('submit',async e=>{e.preventDefault();if(!client){$('loginMsg').textContent='請先完成 Supabase 專案設定';return}$('signIn').disabled=true;$('loginMsg').textContent='登入中…';const {error}=await client.auth.signInWithPassword({email:$('email').value,password:$('password').value});$('signIn').disabled=false;$('loginMsg').textContent=error?error.message:'登入成功';});
-function showPasswordSetup(){$('passwordCard').classList.remove('hidden');$('loginCard').classList.add('hidden');$('main').classList.add('hidden');$('nav').classList.add('hidden')}
+function showPasswordSetup(){document.body.classList.remove('login-mode');$('passwordCard').classList.remove('hidden');$('loginCard').classList.add('hidden');$('main').classList.add('hidden');$('nav').classList.add('hidden')}
 $('newPasswordForm').addEventListener('submit',async e=>{e.preventDefault();if(!client)return;const p=$('newPassword').value;if(p.length<12||p!==$('confirmPassword').value){$('passwordMsg').textContent='兩次密碼不一致，或密碼少於 12 個字元';return}const {error}=await client.auth.updateUser({password:p});if(error){$('passwordMsg').textContent='設定失敗：'+error.message;return}$('passwordMsg').textContent='密碼設定成功';$('newPasswordForm').reset();$('passwordCard').classList.add('hidden');history.replaceState(null,'',location.pathname);const {data}=await client.auth.getSession();await setSession(data.session)});
 async function signOut(){if(client)await client.auth.signOut()}
 async function reload(){if(!session||!client)return;const {data,error}=await client.from('breakfast_orders').select('*').order('pickup_date',{ascending:true}).order('created_at',{ascending:true}).limit(5000);if(error){info('同步失敗：'+error.message);return}orders=data||[];info('✅ 已同步 '+orders.length+' 筆｜'+new Date().toLocaleTimeString('zh-TW'));draw()}
