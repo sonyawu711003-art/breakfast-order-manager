@@ -23,10 +23,16 @@ function qtyAfter(fragment){const m=fragment.match(/^\s*(?:[×xX*+]\s*(\d{1,2})|
 function parseLine(line,ctx){const s=canon(line);const ds=dates(s,ctx.year);if(!ds.length&&!ctx.defaultDate)return [];const hits=itemMatches(s,ctx.menu);if(!hits.length)return [];
 const result=[];for(let i=0;i<hits.length;i++){const hit=hits[i];let day=ctx.defaultDate||'';for(const d of ds){if(d.start<hit.start)day=d.date}
 const next=hits[i+1];const quantity=qtyAfter(s.slice(hit.end,next?.start||s.length));const flexible=/(?:任一|任一天|其中一天|擇一|隨便一天)/.test(s)&&ds.length>1; if(flexible)day='';
+const unknownMultipleDates=ds.length>1&&ds.every(d=>d.start<hit.start)&&!/(?:各|每[天日])/.test(s);if(unknownMultipleDates)day='';
 const uncertain=!ctx.customer||!day||!Number.isInteger(quantity)||quantity<1||quantity>50;
-result.push({customer:ctx.customer||'',date:day,item:hit.item,qty:quantity,notes:s,mode:/取消|退訂|不要了/.test(s)?'cancel':/改成|改期|改為|更改|換成|修改/.test(s)?'edit':'add',reviewRequired:uncertain||/取消|更改|改期|改成|改為|換成|追加|改訂/.test(s),reason:!ctx.customer?'無法確認發言者':flexible?'跨日期任選一天，需請客人確認':!day?'取餐日期不明':'需比對原訂單',sourceIndex:ctx.sourceIndex??0,line:ctx.lineNo??0})}return result}
+result.push({customer:ctx.customer||'',date:day,item:hit.item,qty:quantity,notes:s,mode:/取消|退訂|不要了/.test(s)?'cancel':/改成|改期|改為|更改|換成|修改/.test(s)?'edit':'add',reviewRequired:uncertain||/取消|更改|改期|改成|改為|換成|追加|改訂/.test(s),reason:!ctx.customer?'無法確認發言者':flexible?'跨日期任選一天，需請客人確認':unknownMultipleDates?'多個日期未清楚分配品項':!day?'取餐日期不明':'需比對原訂單',sourceIndex:ctx.sourceIndex??0,line:ctx.lineNo??0})}return result}
 function parse(text,opts={}){const year=opts.year||new Date().getFullYear();const menu=opts.menu||[];let customer='',sourceIndex=0,date=opts.defaultDate||'',lineNo=0,skipping=false;const out=[],lines=String(text).split(/\r?\n/);
-for(let i=0;i<lines.length;i++){lineNo=i;const s=canon(lines[i]);if(!s)continue;const src=s.match(/^【截圖\s*(\d+)】/);if(src){sourceIndex=+src[1]-1;customer='';date=opts.defaultDate||'';skipping=false;continue}
+for(let i=0;i<lines.length;i++){lineNo=i;const rawLine=lines[i];const parts=rawLine.split('\t');
+let lineInput=rawLine;
+if(parts.length>=3 && /^\s*(?:上午|下午)?\s*\d{1,2}:\d{2}/.test(parts[0])){
+ customer=parts[1].trim();lineInput=parts.slice(2).join(' ');
+}
+const s=canon(lineInput);if(!s)continue;const src=s.match(/^【截圖\s*(\d+)】/);if(src){sourceIndex=+src[1]-1;customer='';date=opts.defaultDate||'';skipping=false;continue}
 if(/吃早餐\s*[|｜]/.test(s)&&/口味|NEW|下週|預訂|限量/.test(s)){skipping=true;customer='';continue}
 if(skipping){if(/^已讀|^@|^以上收到/.test(s))skipping=false;continue}
 if(ignored.test(s)){if(/^(?:已讀|@|以上收到)/.test(s))customer='';continue}
