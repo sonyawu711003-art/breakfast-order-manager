@@ -4,7 +4,7 @@ let menuRows=[],proposalRows=[],extrasChannel=null;
 const money=v=>v===null||v===undefined?'未定價':'$'+Number(v).toFixed(0);
 function extrasMount(){
 const root=document.getElementById('main'),nav=document.getElementById('nav');
-root.insertAdjacentHTML('beforeend','<div id="reviewQueue" class="screen hidden"><h2>✅ 共同審核</h2><p class="hint">兩位管理者都可以核准或退回；核准後才更新正式訂單。</p><button onclick="refreshExtras()">重新整理</button><div id="proposalList"></div></div><div id="menuScreen" class="screen hidden"><h2>📋 菜單及價格管理</h2><p class="hint">菜單改價不會追溯更改已成立訂單。</p><div class="card"><form id="menuForm"><input type="hidden" id="menuId"><label>品項名稱<input id="menuName" required maxlength="150"></label><label>類別<select id="menuCategory"><option>貝果</option><option>三明治</option><option>漢堡</option><option>吐司</option><option>沙拉</option><option>飲料</option><option>甜點</option><option>其他</option></select></label><label>群友單價<input id="menuPrice" type="number" min="0" step=".01" placeholder="未定價可留空"></label><label>一般售價<input id="menuRegularPrice" type="number" min="0" step=".01" placeholder="未定價可留空"></label><label>品項介紹<textarea id="menuDescription" rows="3"></textarea></label><label><input id="menuActive" type="checkbox" style="width:auto;display:inline" checked> 啟用</label><p><button type="submit">儲存菜單</button> <button type="button" class="secondary" onclick="clearMenuForm()">清空</button></p></form></div><input id="menuSearch" placeholder="搜尋品項" oninput="drawMenu()"><div id="menuList"></div></div>');
+root.insertAdjacentHTML('beforeend','<div id="reviewQueue" class="screen hidden"><h2>✅ 共同審核</h2><p class="hint">兩位管理者都可以核准或退回；核准後才更新正式訂單。</p><button onclick="refreshExtras()">重新整理</button><div id="proposalList"></div></div><div id="menuScreen" class="screen hidden"><h2>📋 菜單及價格管理</h2><p class="hint">菜單改價不會追溯更改已成立訂單。</p><div class="card"><b>📥 Google 商家完整菜單（2026/11/08）</b><p class="hint">62 項、12 類；一般售價與群友價分開記錄。原訂單價格不變。已停用的舊口味不會自動重新上架。</p><button type="button" id="importGoogleMenu" onclick="importGoogleMenu()">匯入／更新 62 項菜單</button><p id="importGoogleStatus" class="hint"></p></div><div class="card"><form id="menuForm"><input type="hidden" id="menuId"><label>品項名稱<input id="menuName" required maxlength="150"></label><label>類別<select id="menuCategory"><option>貝果</option><option>三明治</option><option>漢堡</option><option>吐司</option><option>沙拉</option><option>輕食</option><option>沙拉加購</option><option>韓式吐司</option><option>小漢堡</option><option>輕食堡</option><option>歐式</option><option>飲品</option><option>飲料</option><option>甜點</option><option>禮盒</option><option>小禮盒</option><option>其他</option></select></label><label>群友單價<input id="menuPrice" type="number" min="0" step=".01" placeholder="未定價可留空"></label><label>一般售價<input id="menuRegularPrice" type="number" min="0" step=".01" placeholder="未定價可留空"></label><label>品項介紹<textarea id="menuDescription" rows="3"></textarea></label><label><input id="menuActive" type="checkbox" style="width:auto;display:inline" checked> 啟用</label><p><button type="submit">儲存菜單</button> <button type="button" class="secondary" onclick="clearMenuForm()">清空</button></p></form></div><input id="menuSearch" placeholder="搜尋品項" oninput="drawMenu()"><div id="menuList"></div></div>');
 nav.insertAdjacentHTML('beforeend','<button onclick="tab(\'reviewQueue\')">審核</button><button onclick="tab(\'menuScreen\')">菜單</button>');
 document.getElementById('dashboard').insertAdjacentHTML('afterbegin','<div class="card"><b>📸 LINE 截圖辨識與送審</b><p class="hint">可由兩位管理者上傳，OCR 需人工核對，正式訂單不會直接變更。</p><a href="./cloud-capture.html" style="display:inline-block;padding:12px;border-radius:9px;background:#265b4c;color:#fff;text-decoration:none">上傳 LINE 截圖</a></div><div class="card" id="cloudRevenue">訂單金額載入中…</div>');
 document.getElementById('item').insertAdjacentHTML('beforebegin','<label>菜單快捷選擇<select id="menuChooser"><option value="">可挑選菜單或手動輸入品名</option></select></label><label>本筆訂單價格類型<select id="menuPriceType"><option value="member">群友價</option><option value="regular">一般售價</option></select></label>');
@@ -15,6 +15,57 @@ document.getElementById('menuPriceType').addEventListener('change',function(){co
 document.getElementById('item').addEventListener('change',function(){if(document.getElementById('editId').value)return;const m=menuRows.find(x=>x.active&&x.name===this.value.trim());if(m){document.getElementById('price').value=m.price===null?'':m.price;previewAmount()}});
 document.getElementById('menuForm').addEventListener('submit',saveMenu);
 previewAmount();
+}
+async function importGoogleMenu(){
+ const data=window.BREAKFAST_GOOGLE_MENU_20261108||[];
+ const status=document.getElementById('importGoogleStatus'),button=document.getElementById('importGoogleMenu');
+ if(!client||!session){alert('請先登入管理者帳號');return}
+ if(data.length!==62){alert('菜單資料尚未載入完整，請重新整理頁面');return}
+ if(!confirm('確定匯入 Google 商家菜單 62 項？\n這會新增或更新菜單售價，但不會回溯修改任何已成立訂單。'))return;
+ button.disabled=true;let added=0,updated=0,failed=0;const errors=[];
+ const aliases={
+  '原味炙燒北海道明太子貝果':['原味明太子','原味炙燒明太子'],
+  '巧克力藍莓乳酪貝果':['巧克力藍莓乳酪'],
+  '牛奶芝麻奶霜貝果':['牛奶芝麻奶霜'],
+  '大甲香芋貝果':['大甲芋頭'],
+  '南瓜焦糖乳酪貝果':['南瓜焦糖'],
+  '起司培根貝果':['起司培根'],
+  '鐵觀音桂圓貝果':['鐵觀音桂圓'],
+  '松露鹽之花貝果':['松露鹽之花'],
+  '抹茶卡士達貝果':['抹茶卡士達'],
+  '巧克力阿華田貝果':['巧克力阿華田'],
+  '蜂蜜燕麥貝果':['蜂蜜燕麥'],
+  '玫瑰蔓越莓紅寶石':['蔓越莓玫瑰紅寶石'],
+  '咖啡核桃貝果':['咖啡核桃'],
+  '抹茶開心果貝果':['抹茶開心果'],
+  '古早味紅茶':['紅茶']
+ };
+ try{
+  const {data:current,error:fetchError}=await client.from('breakfast_menu').select('id,name');
+  if(fetchError)throw new Error(fetchError.message);
+  const byName=new Map((current||[]).map(x=>[x.name,x.id]));
+  for(const rec of data){
+   const exact=byName.get(rec.name);
+   const alias=!exact?(aliases[rec.name]||[]).find(a=>byName.has(a)):null;
+   const existingId=exact||(alias?byName.get(alias):null);
+   const payload={...rec};
+   const result=existingId
+    ?await client.from('breakfast_menu').update(payload).eq('id',existingId).select('id')
+    :await client.from('breakfast_menu').insert(payload).select('id');
+   if(result.error||!result.data?.length){
+    failed++;errors.push(rec.name+'：'+(result.error?.message||'儲存未成功'));
+   }else{
+    if(existingId)updated++;else added++;
+    byName.set(rec.name,result.data[0].id);
+    if(alias)byName.delete(alias);
+   }
+   status.textContent='正在匯入 '+(added+updated+failed)+'／'+data.length+' 項…';
+  }
+  status.textContent='菜單匯入結果：新增 '+added+'、更新 '+updated+'、失敗 '+failed+'。'+(failed?'前幾項錯誤：'+errors.slice(0,3).join('；'):'已完成；歷史訂單未變更。');
+  await refreshExtras();
+  if(failed)alert(status.textContent+'\n如顯示找不到 regular_price 或 description 欄位，請先執行 Supabase 菜單欄位升級 SQL。');
+ }catch(e){status.textContent='無法匯入：'+e.message}
+ finally{button.disabled=false}
 }
 function menuSelectedPrice(m){const typ=document.getElementById('menuPriceType').value;const p=typ==='regular'?m.regular_price:m.price;return p===null||p===undefined?'':p}
 function previewAmount(){const p=document.getElementById('price').value,q=Number(document.getElementById('qty').value),o=document.getElementById('totalOverride').value;document.getElementById('totalPreview').textContent='訂單金額：'+(o!==''?money(Number(o))+'（手動）':p!==''?money(Number(p)*q)+'（自動）':'未定價')}
