@@ -4,16 +4,18 @@ let menuRows=[],proposalRows=[],extrasChannel=null;
 const money=v=>v===null||v===undefined?'未定價':'$'+Number(v).toFixed(0);
 function extrasMount(){
 const root=document.getElementById('main'),nav=document.getElementById('nav');
-root.insertAdjacentHTML('beforeend','<div id="reviewQueue" class="screen hidden"><h2>✅ 共同審核</h2><p class="hint">兩位管理者都可以核准或退回；核准後才更新正式訂單。</p><button onclick="refreshExtras()">重新整理</button><div id="proposalList"></div></div><div id="menuScreen" class="screen hidden"><h2>📋 菜單及價格管理</h2><p class="hint">菜單改價不會追溯更改已成立訂單。</p><div class="card"><b>📥 Google 商家菜單＋3 款新品</b><p class="hint">65 項、12 類；新增的 3 款為照片上的試吃價，正式售價待確認。原訂單價格不變。已停用的舊口味不會自動重新上架。</p><button type="button" id="importGoogleMenu" onclick="importGoogleMenu()">匯入／更新 65 項菜單</button><p id="importGoogleStatus" class="hint"></p></div><div class="card"><form id="menuForm"><input type="hidden" id="menuId"><label>品項名稱<input id="menuName" required maxlength="150"></label><label>類別<select id="menuCategory"><option>貝果</option><option>三明治</option><option>漢堡</option><option>吐司</option><option>沙拉</option><option>輕食</option><option>沙拉加購</option><option>韓式吐司</option><option>小漢堡</option><option>輕食堡</option><option>歐式</option><option>飲品</option><option>飲料</option><option>甜點</option><option>禮盒</option><option>小禮盒</option><option>其他</option></select></label><label>群友單價<input id="menuPrice" type="number" min="0" step=".01" placeholder="未定價可留空"></label><label>一般售價<input id="menuRegularPrice" type="number" min="0" step=".01" placeholder="未定價可留空"></label><label>品項介紹<textarea id="menuDescription" rows="3"></textarea></label><label><input id="menuActive" type="checkbox" style="width:auto;display:inline" checked> 啟用</label><p><button type="submit">儲存菜單</button> <button type="button" class="secondary" onclick="clearMenuForm()">清空</button></p></form></div><input id="menuSearch" placeholder="搜尋品項" oninput="drawMenu()"><div id="menuList"></div></div>');
+root.insertAdjacentHTML('beforeend','<div id="reviewQueue" class="screen hidden"><h2>✅ 共同審核</h2><p class="hint">兩位管理者都可以核准或退回；核准後才更新正式訂單。</p><button onclick="refreshExtras()">重新整理</button><div id="proposalList"></div></div><div id="menuScreen" class="screen hidden"><h2>📋 菜單及價格管理</h2><p class="hint">菜單改價不會追溯更改已成立訂單。</p><div class="card"><b>📥 Google 商家菜單＋3 款新品</b><p class="hint">65 項、12 類；新增的 3 款為照片上的試吃價，正式售價待確認。原訂單價格不變。已停用的舊口味不會自動重新上架。</p><button type="button" id="importGoogleMenu" onclick="importGoogleMenu()">匯入／更新 65 項菜單</button><p id="importGoogleStatus" class="hint"></p></div><div class="card"><form id="menuForm"><input type="hidden" id="menuId"><label>品項名稱<input id="menuName" required maxlength="150"></label><label>類別<select id="menuCategory"><option>貝果</option><option>三明治</option><option>漢堡</option><option>吐司</option><option>沙拉</option><option>輕食</option><option>沙拉加購</option><option>韓式吐司</option><option>小漢堡</option><option>輕食堡</option><option>歐式</option><option>飲品</option><option>飲料</option><option>甜點</option><option>禮盒</option><option>小禮盒</option><option>其他</option></select></label><label id="menuPriceLabel">售價<input id="menuPrice" type="number" min="0" step=".01" placeholder="未定價可留空"></label><label id="menuRegularLabel">一般售價<input id="menuRegularPrice" type="number" min="0" step=".01" placeholder="未定價可留空"></label><p class="hint" id="menuPriceHelp">僅貝果、甜點可設定群友價，其他類別只有單一售價。</p><label>品項介紹<textarea id="menuDescription" rows="3"></textarea></label><label><input id="menuActive" type="checkbox" style="width:auto;display:inline" checked> 啟用</label><p><button type="submit">儲存菜單</button> <button type="button" class="secondary" onclick="clearMenuForm()">清空</button></p></form></div><input id="menuSearch" placeholder="搜尋品項" oninput="drawMenu()"><div id="menuList"></div></div>');
 nav.insertAdjacentHTML('beforeend','<button onclick="tab(\'reviewQueue\')">審核</button><button onclick="tab(\'menuScreen\')">菜單</button>');
 document.getElementById('dashboard').insertAdjacentHTML('afterbegin','<div class="card"><b>📸 LINE 截圖辨識與送審</b><p class="hint">可由兩位管理者上傳，OCR 需人工核對，正式訂單不會直接變更。</p><a href="./cloud-capture.html?v=20261108-time1" style="display:inline-block;padding:12px;border-radius:9px;background:#265b4c;color:#fff;text-decoration:none">上傳 LINE 截圖</a></div><div class="card" id="cloudRevenue">訂單金額載入中…</div>');
-document.getElementById('item').insertAdjacentHTML('beforebegin','<label>菜單快捷選擇<select id="menuChooser"><option value="">可挑選菜單或手動輸入品名</option></select></label><label>本筆訂單價格類型<select id="menuPriceType"><option value="member">群友價</option><option value="regular">一般售價</option></select></label>');
+document.getElementById('item').insertAdjacentHTML('beforebegin','<label>菜單快捷選擇<select id="menuChooser"><option value="">可挑選菜單或手動輸入品名</option></select></label><label id="orderPriceTypeLabel" class="hidden">本筆訂單價格類型<select id="menuPriceType"><option value="member">群友價</option><option value="regular">一般售價</option></select></label>');
 document.getElementById('notes').insertAdjacentHTML('afterend','<label>手動調整整筆總金額（留空＝單價×數量）<input type="number" min="0" step=".01" id="totalOverride"></label><p id="totalPreview" class="hint"></p>');
-document.getElementById('menuChooser').addEventListener('change',function(){const m=menuRows.find(x=>x.id===this.value);if(!m)return;document.getElementById('item').value=m.name;document.getElementById('price').value=menuSelectedPrice(m);document.getElementById('totalOverride').value='';previewAmount()});
+document.getElementById('menuChooser').addEventListener('change',function(){const m=menuRows.find(x=>x.id===this.value);if(!m)return;document.getElementById('item').value=m.name;document.getElementById('price').value=menuSelectedPrice(m);updateOrderPriceType(m);document.getElementById('totalOverride').value='';previewAmount()});
 document.getElementById('menuPriceType').addEventListener('change',function(){const m=menuRows.find(x=>x.id===document.getElementById('menuChooser').value);if(!m||document.getElementById('editId').value)return;document.getElementById('price').value=menuSelectedPrice(m);document.getElementById('totalOverride').value='';previewAmount()});
 ['price','qty','totalOverride'].forEach(id=>document.getElementById(id).addEventListener('input',previewAmount));
-document.getElementById('item').addEventListener('change',function(){if(document.getElementById('editId').value)return;const m=menuRows.find(x=>x.active&&x.name===this.value.trim());if(m){document.getElementById('price').value=m.price===null?'':m.price;previewAmount()}});
+document.getElementById('item').addEventListener('change',function(){if(document.getElementById('editId').value)return;const m=menuRows.find(x=>x.active&&x.name===this.value.trim());if(m){document.getElementById('price').value=menuSelectedPrice(m);updateOrderPriceType(m);previewAmount()}else updateOrderPriceType(null)});
 document.getElementById('menuForm').addEventListener('submit',saveMenu);
+document.getElementById('menuCategory').addEventListener('change',updateMenuPriceLabels);
+updateMenuPriceLabels();
 previewAmount();
 }
 async function importGoogleMenu(){
@@ -45,7 +47,8 @@ async function importGoogleMenu(){
   const {data:current,error:fetchError}=await client.from('breakfast_menu').select('id,name');
   if(fetchError)throw new Error(fetchError.message);
   const byName=new Map((current||[]).map(x=>[x.name,x.id]));
-  for(const rec of data){
+  for(const original of data){
+   const rec={...original};if(!canHaveMemberPrice(rec.category))rec.regular_price=rec.price;
    const exact=byName.get(rec.name);
    const alias=!exact?(aliases[rec.name]||[]).find(a=>byName.has(a)):null;
    const existingId=exact||(alias?byName.get(alias):null);
@@ -68,14 +71,38 @@ async function importGoogleMenu(){
  }catch(e){status.textContent='無法匯入：'+e.message}
  finally{button.disabled=false}
 }
-function menuSelectedPrice(m){const typ=document.getElementById('menuPriceType').value;const p=typ==='regular'?m.regular_price:m.price;return p===null||p===undefined?'':p}
+function canHaveMemberPrice(category){return category==='貝果'||category==='甜點'}
+function menuPriceCaption(m){
+ const std=m.regular_price??m.price;
+ if(!canHaveMemberPrice(m.category))return '售價 '+money(std);
+ if(m.price==null&&std==null)return '售價待確認';
+ if(m.price!=null&&std!=null&&Number(m.price)!==Number(std))return '一般 '+money(std)+'｜群友 '+money(m.price);
+ return '售價 '+money(std);
+}
+function updateMenuPriceLabels(){
+ const eligible=canHaveMemberPrice(document.getElementById('menuCategory').value);
+ document.getElementById('menuPriceLabel').firstChild.textContent=eligible?'群友價（可不另設優惠）':'售價';
+ document.getElementById('menuRegularLabel').classList.toggle('hidden',!eligible);
+ document.getElementById('menuPriceHelp').textContent=eligible?'可分別設定一般售價與群友價；沒有群友優惠時兩者填相同金額。':'此類商品只有單一售價，沒有群友價。';
+}
+function updateOrderPriceType(m){
+ const eligible=m&&canHaveMemberPrice(m.category)&&m.price!=null&&m.regular_price!=null&&Number(m.price)!==Number(m.regular_price);
+ document.getElementById('orderPriceTypeLabel').classList.toggle('hidden',!eligible);
+ if(!eligible)document.getElementById('menuPriceType').value='regular';
+}
+function menuSelectedPrice(m){
+ const typ=document.getElementById('menuPriceType').value;
+ const p=canHaveMemberPrice(m.category)&&typ==='member'?(m.price??m.regular_price):(m.regular_price??m.price);
+ return p===null||p===undefined?'':p
+}
 function previewAmount(){const p=document.getElementById('price').value,q=Number(document.getElementById('qty').value),o=document.getElementById('totalOverride').value;document.getElementById('totalPreview').textContent='訂單金額：'+(o!==''?money(Number(o))+'（手動）':p!==''?money(Number(p)*q)+'（自動）':'未定價')}
-function clearMenuForm(){document.getElementById('menuForm').reset();document.getElementById('menuId').value='';document.getElementById('menuActive').checked=true}
+function clearMenuForm(){document.getElementById('menuForm').reset();document.getElementById('menuId').value='';document.getElementById('menuActive').checked=true;updateMenuPriceLabels()}
 async function saveMenu(e){e.preventDefault();if(!client||!session)return;const id=document.getElementById('menuId').value;const rec={name:document.getElementById('menuName').value.trim(),category:document.getElementById('menuCategory').value,price:document.getElementById('menuPrice').value===''?null:Number(document.getElementById('menuPrice').value),regular_price:document.getElementById('menuRegularPrice').value===''?null:Number(document.getElementById('menuRegularPrice').value),description:document.getElementById('menuDescription').value,active:document.getElementById('menuActive').checked};
+if(!canHaveMemberPrice(rec.category))rec.regular_price=rec.price;
 const r=id?await client.from('breakfast_menu').update(rec).eq('id',id).select('id'):await client.from('breakfast_menu').insert(rec).select('id');if(r.error||!r.data?.length){alert('儲存失敗：'+(r.error?.message||'無權限'));return}clearMenuForm();await refreshExtras()}
-function editMenu(id){const m=menuRows.find(x=>x.id===id);if(!m)return;tab('menuScreen');document.getElementById('menuId').value=m.id;document.getElementById('menuName').value=m.name;document.getElementById('menuCategory').value=m.category;document.getElementById('menuPrice').value=m.price===null?'':m.price;document.getElementById('menuRegularPrice').value=m.regular_price??'';document.getElementById('menuDescription').value=m.description??'';document.getElementById('menuActive').checked=m.active;window.scrollTo(0,0)}
-function drawMenu(){const q=document.getElementById('menuSearch').value.toLowerCase();document.getElementById('menuList').innerHTML=menuRows.filter(m=>(m.name+m.category).toLowerCase().includes(q)).map(m=>'<div class="card row"><span><b>'+htmlEscape(m.name)+'</b> <span class="hint">'+htmlEscape(m.category)+'</span><br>'+'群友 '+money(m.price)+'｜一般 '+money(m.regular_price)+(m.description?'<p class="hint">'+htmlEscape(m.description)+'</p>':'')+(m.active?'':'（停用）')+'</span><button class="secondary" data-m="'+m.id+'">修改</button></div>').join('')||'<p>尚無菜單資料</p>';document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>editMenu(b.dataset.m));
-const select=document.getElementById('menuChooser'),prev=select.value;select.innerHTML='<option value="">可挑選菜單或手動輸入品名</option>'+menuRows.filter(m=>m.active).map(m=>'<option value="'+m.id+'">'+htmlEscape(m.category)+'｜'+htmlEscape(m.name)+' 群友 '+money(m.price)+' / 一般 '+money(m.regular_price)+'</option>').join('');select.value=prev}
+function editMenu(id){const m=menuRows.find(x=>x.id===id);if(!m)return;tab('menuScreen');document.getElementById('menuId').value=m.id;document.getElementById('menuName').value=m.name;document.getElementById('menuCategory').value=m.category;document.getElementById('menuPrice').value=m.price===null?'':m.price;document.getElementById('menuRegularPrice').value=m.regular_price??'';document.getElementById('menuDescription').value=m.description??'';document.getElementById('menuActive').checked=m.active;updateMenuPriceLabels();window.scrollTo(0,0)}
+function drawMenu(){const q=document.getElementById('menuSearch').value.toLowerCase();document.getElementById('menuList').innerHTML=menuRows.filter(m=>(m.name+m.category).toLowerCase().includes(q)).map(m=>'<div class="card row"><span><b>'+htmlEscape(m.name)+'</b> <span class="hint">'+htmlEscape(m.category)+'</span><br>'+menuPriceCaption(m)+(m.description?'<p class="hint">'+htmlEscape(m.description)+'</p>':'')+(m.active?'':'（停用）')+'</span><button class="secondary" data-m="'+m.id+'">修改</button></div>').join('')||'<p>尚無菜單資料</p>';document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>editMenu(b.dataset.m));
+const select=document.getElementById('menuChooser'),prev=select.value;select.innerHTML='<option value="">可挑選菜單或手動輸入品名</option>'+menuRows.filter(m=>m.active).map(m=>'<option value="'+m.id+'">'+htmlEscape(m.category)+'｜'+htmlEscape(m.name)+' '+menuPriceCaption(m)+'</option>').join('');select.value=prev}
 async function refreshExtras(){if(!client||!session)return;const [a,b]=await Promise.all([client.from('breakfast_menu').select('*').order('category').order('name'),client.from('breakfast_proposals').select('*').order('submitted_at',{ascending:false}).limit(300)]);if(a.error||b.error){window.BREAKFAST_UPGRADE_READY=false;const msg=a.error?.message||b.error?.message;document.getElementById('proposalList').textContent='請先執行 Supabase 升級 SQL：'+msg;document.getElementById('menuList').textContent='菜單表尚未建立';return}window.BREAKFAST_UPGRADE_READY=true;menuRows=a.data||[];proposalRows=b.data||[];drawMenu();drawProposals();previewAmount()}
 function groupPendingProposals(){
  const groups=new Map();
