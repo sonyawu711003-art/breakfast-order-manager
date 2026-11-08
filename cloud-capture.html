@@ -6,12 +6,12 @@
 <div class="card" id="access"><b>登入狀態確認中…</b></div>
 <div id="content" class="hidden">
 <div class="card"><h2>① 選擇 LINE 截圖</h2><input id="images" type="file" multiple accept="image/png,image/jpeg,image/webp"><button id="scanBtn" onclick="scanImages()">辨識截圖</button><div id="scanMsg" class="status"></div><div id="thumbnails"></div></div>
-<div class="card"><h2>② 核對原始文字</h2><p class="hint">更推薦直接匯入 LINE 匯出的聊天紀錄 TXT，可保留原本的發言人與時間；若只有照片，仍可用上方 OCR。</p><label>LINE 聊天紀錄 TXT（可選）<input type="file" id="chatTxt" accept=".txt,text/plain"></label><button class="alt" onclick="importChatTxt()">讀取 TXT 原始訊息</button><p class="hint">可貼上 LINE 匯出的文字，也可直接改正 OCR 內容。識別結果還不是正式訂單。</p><textarea rows="9" id="rawText" placeholder="可先選擇截圖辨識，或貼上 LINE 原始對話"></textarea><label>預設取餐日期（無法辨識時用）<input type="date" id="defaultDate"></label><button onclick="extractCandidates()">從文字產生候選單</button> <button class="alt" onclick="addCandidate()">手動新增一筆候選</button></div>
+<div class="card"><h2>② 核對原始文字</h2><p class="hint">更推薦直接匯入 LINE 匯出的聊天紀錄 TXT，可保留原本的發言人與時間；若只有照片，仍可用上方 OCR。</p><label>LINE 聊天紀錄 TXT（可選）<input type="file" id="chatTxt" accept=".txt,text/plain"></label><div class="cols"><label>只分析訊息日期：起<input id="txtFrom" type="date"></label><label>迄<input id="txtTo" type="date"></label></div><p class="hint">匯出整年聊天也沒關係，只分析選取期間的訊息；不會重新掃描全部歷史訂單。可改範圍補匯。</p><button class="alt" onclick="importChatTxt()">讀取 TXT 原始訊息</button><p class="hint">可貼上 LINE 匯出的文字，也可直接改正 OCR 內容。識別結果還不是正式訂單。</p><textarea rows="9" id="rawText" placeholder="可先選擇截圖辨識，或貼上 LINE 原始對話"></textarea><label>預設取餐日期（無法辨識時用）<input type="date" id="defaultDate"></label><button onclick="extractCandidates()">從文字產生候選單</button> <button class="alt" onclick="addCandidate()">手動新增一筆候選</button></div>
 <div class="card"><h2>③ 人工確認候選訂單</h2><p class="hint">姓名、日期、價格可能辨識錯誤；新增會檢查相似既有單。修改與取消必須選擇原訂單。標示為待處理後，兩位管理者都能在共同審核頁確認。</p><div id="candidates"></div><button id="send" onclick="sendToCloud()">送出勾選的候選單至共同審核</button><p id="sendMsg" class="status"></p></div>
 </div></main>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script><script src="./cloud-config.js"></script><script src="./line-parser-v2.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script><script src="./cloud-config.js"></script><script src="./line-parser-v2.js"></script><script src="./line-txt-v3.js"></script>
 <script>
-let api=null,user=null,menu=[],existing=[],proposals=[],selectedFiles=[],fileHashes=[],fileTexts=[];
+let api=null,user=null,menu=[],existing=[],proposals=[],selectedFiles=[],fileHashes=[],fileTexts=[],currentSource='image';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=v=>v==null?'未定價':'$'+Number(v).toFixed(0);
@@ -29,6 +29,7 @@ const [m,o]=await Promise.all([api.from('breakfast_menu').select('*').eq('active
 if(m.error||o.error){$('access').textContent='請先執行 Supabase 升級 SQL：'+(m.error?.message||o.error?.message);$('content').classList.add('hidden');return}
 menu=m.data||[];existing=o.data||[];
 }
+async function hashText(input){const raw=new TextEncoder().encode(input);const bytes=await crypto.subtle.digest('SHA-256',raw);return Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('')}
 async function sha256(file){const bytes=await file.arrayBuffer();const buf=await crypto.subtle.digest('SHA-256',bytes);return Array.from(new Uint8Array(buf),x=>x.toString(16).padStart(2,'0')).join('')}
 async function loadOcr(){if(window.Tesseract)return;await new Promise((ok,bad)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';s.onload=ok;s.onerror=()=>bad(new Error('文字辨識模組下載失敗'));document.head.appendChild(s)})}
 async function buildOcrTiles(file){
@@ -64,7 +65,7 @@ for(let i=0;i<selectedFiles.length;i++){
 
 }
 await worker.terminate();
-$('rawText').value=fileTexts.map((t,i)=>'【截圖'+(i+1)+'】\n'+t).join('\n\n');
+currentSource='image';$('rawText').value=fileTexts.map((t,i)=>'【截圖'+(i+1)+'】\n'+t).join('\n\n');
 $('scanMsg').textContent='已辨識 '+selectedFiles.length+' 張。請核對文字。';
 }catch(e){$('scanMsg').textContent='辨識失敗：'+e.message+'。可改為貼上原始對話文字。'}
 finally{$('scanBtn').disabled=false}
@@ -73,7 +74,7 @@ async function importChatTxt(){
  const f=$('chatTxt').files?.[0];
  if(!f){alert('請先選擇 LINE 聊天紀錄 TXT');return}
  if(f.size>5*1024*1024){alert('TXT 超過 5MB，請先分段匯出');return}
- let t=await f.text();
+ let t=await f.text();currentSource='txt';
  if(t.includes('\ufffd')){$('scanMsg').textContent='文字檔可能不是 UTF-8 編碼，請先檢查中文是否正常顯示。'}
  $('rawText').value=t;selectedFiles=[];fileHashes=[];fileTexts=[];
  $('scanMsg').textContent='已匯入 LINE TXT '+f.name+'，請先核對再產生候選單。';
@@ -81,10 +82,16 @@ async function importChatTxt(){
 function newCandidate(data={}){return {check:false,customer:'',date:$('defaultDate').value,item:'',qty:1,price:'',total:'',notes:'',mode:'add',target:'',sourceIndex:0,line:0,...data}}
 function extractCandidates(){
 const raw=$('rawText').value;if(!raw.trim()){alert('請先辨識或貼上文字');return}
-const parsed=window.BreakfastLineParser.parse(raw,{year:new Date().getFullYear(),defaultDate:$('defaultDate').value,menu:menu.map(m=>m.name)});
-proposals=parsed.map(p=>newCandidate({customer:p.customer,date:p.date,item:p.item,qty:p.qty,price:menu.find(m=>m.name===p.item)?.price??'',notes:p.notes,mode:p.mode,sourceIndex:p.sourceIndex,line:p.line,flag:p.reviewRequired,reason:p.reason}));
+let parsed=[],unresolved=[],readCount=0;
+if(currentSource==='txt'){
+ const r=window.BreakfastLineTxt.candidates(raw,{from:$('txtFrom').value,to:$('txtTo').value,menu:menu.map(m=>m.name)});
+ parsed=r.candidates;unresolved=r.unresolved;readCount=r.messagesRead;
+}else parsed=window.BreakfastLineParser.parse(raw,{year:new Date().getFullYear(),defaultDate:$('defaultDate').value,menu:menu.map(m=>m.name)});
+proposals=parsed.map(p=>newCandidate({customer:p.customer,date:p.date,item:p.item,qty:p.qty,price:menu.find(m=>m.name===p.item)?.price??'',notes:p.notes,mode:p.mode,sourceIndex:p.sourceIndex||0,line:p.line,flag:p.reviewRequired,reason:p.reason,sourceMessageDate:p.messageDate||'',sourceMessageTime:p.messageTime||''}));
+unresolved.forEach(p=>proposals.push(newCandidate({customer:p.sender,date:'',notes:p.body,flag:true,reason:p.reason,mode:/取消|改|換/.test(p.body)?'edit':'add',line:p.line*1000,sourceMessageDate:p.posted,sourceMessageTime:p.time})));
 if(!proposals.length)proposals=[newCandidate({notes:raw.slice(0,500),flag:true,reason:'無法可靠判讀，請手動建立候選訂單',line:100000})];
 drawCandidates();
+if(currentSource==='txt')$('sendMsg').textContent='TXT 已解析：'+readCount+' 則訊息，產生 '+parsed.length+' 筆候選；另有 '+unresolved.length+' 則無法確定的訊息。都尚未更新正式訂單。';
 }
 function addCandidate(){proposals.push(newCandidate({line:100000+proposals.length}));drawCandidates()}
 function targetOptions(value){return '<option value="">請選擇要更改／取消的原訂單</option>'+existing.map(o=>'<option value="'+o.id+'" '+(value===o.id?'selected':'')+'>'+esc(o.pickup_date+'｜'+o.customer+'｜'+o.item+' ×'+o.quantity)+'</option>').join('')}
@@ -117,10 +124,11 @@ for(const p of chosen){
 let successes=0;
 for(const p of chosen){
  const source=selectedFiles[p.sourceIndex]?fileHashes[p.sourceIndex]||await sha256(selectedFiles[p.sourceIndex]):null;
+ const txtFingerprint=currentSource==='txt'? await hashText('line-txt-v3|'+p.customer+'|'+p.sourceMessageDate+'|'+p.sourceMessageTime+'|'+p.line+'|'+p.item+'|'+p.notes):null;
  const target=existing.find(x=>x.id===p.target);
- const rec={change_type:p.mode,target_order_id:p.mode==='add'?null:p.target||null,target_version:p.mode==='add'?null:target?.version||null,customer:p.customer.trim(),pickup_date:p.date,item:p.item.trim(),quantity:p.qty,price:p.price===''?null:Number(p.price),total_override:p.total===''?null:Number(p.total),notes:p.notes,ocr_text:$('rawText').value.slice(0,60000),screenshot_path:paths[p.sourceIndex]||null,source_hash:source?source+':'+p.line:null,submitted_by:user.id};
+ const rec={change_type:p.mode,target_order_id:p.mode==='add'?null:p.target||null,target_version:p.mode==='add'?null:target?.version||null,customer:p.customer.trim(),pickup_date:p.date,item:p.item.trim(),quantity:p.qty,price:p.price===''?null:Number(p.price),total_override:p.total===''?null:Number(p.total),notes:p.notes,ocr_text:$('rawText').value.slice(0,60000),screenshot_path:paths[p.sourceIndex]||null,source_hash:source?source+':'+p.line:txtFingerprint,submitted_by:user.id};
  const {error}=await api.from('breakfast_proposals').insert(rec);
- if(error)throw new Error('建立待審失敗：'+error.message);
+ if(error&&error.code==='23505'){continue}if(error)throw new Error('建立待審失敗：'+error.message);
  successes++;p.check=false;
 }
 $('sendMsg').textContent='✅ 已送出 '+successes+' 筆共同待審訂單。請返回雲端首頁點「審核」進行核准。';
@@ -128,5 +136,5 @@ drawCandidates();
 }catch(e){$('sendMsg').textContent='部分資料可能已送出，請先回共同審核清單確認，避免重送。\n'+e.message}
 finally{button.disabled=false}
 }
-init();
+const today=new Date();const daysAgo=new Date(today);daysAgo.setDate(daysAgo.getDate()-7);$('txtFrom').value=daysAgo.getFullYear()+'-'+String(daysAgo.getMonth()+1).padStart(2,'0')+'-'+String(daysAgo.getDate()).padStart(2,'0');$('txtTo').value=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');init();
 </script></body></html>
