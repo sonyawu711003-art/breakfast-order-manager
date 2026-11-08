@@ -23,3 +23,9 @@ a{color:#a75322}
 .order-line{border-top-color:#f2e0c8}
 .status{color:#a25b2d}
 @media(max-width:390px){main{padding:12px 10px 40px}.card{padding:13px}.cols{gap:7px}header .capture-brand img{width:63px;height:52px}}
+
+/* 自動小計清楚可讀；特殊總額預設收合。 */
+.auto-subtotal{margin:5px 0 10px;display:flex;align-items:center;min-height:45px;padding:11px 13px;background:linear-gradient(105deg,#fff2d7,#ffead0);color:#87451d;border:1.5px solid #e8bf89;border-radius:13px;font-size:18px;font-weight:900;font-variant-numeric:tabular-nums}
+.total-override{margin:9px 0 13px;background:#fff9ed;border:1px dashed #e7cba5;border-radius:13px;padding:10px 13px}
+.total-override summary{cursor:pointer;font-size:13px;font-weight:750;color:#95613d}
+.total-override[open] summary{margin-bottom:9px}
