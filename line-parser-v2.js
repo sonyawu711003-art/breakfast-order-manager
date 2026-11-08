@@ -25,8 +25,26 @@ const result=[];for(let i=0;i<hits.length;i++){const hit=hits[i];let day=ctx.def
 const next=hits[i+1];const quantity=qtyAfter(s.slice(hit.end,next?.start||s.length));const flexible=/(?:任一|任一天|其中一天|擇一|隨便一天)/.test(s)&&ds.length>1; if(flexible)day='';
 const unknownMultipleDates=ds.length>1&&ds.every(d=>d.start<hit.start)&&!/(?:各|每[天日])/.test(s);if(unknownMultipleDates)day='';
 const uncertain=!ctx.customer||!day||!Number.isInteger(quantity)||quantity<1||quantity>50;
-result.push({customer:ctx.customer||'',date:day,item:hit.item,qty:quantity,notes:s,mode:/取消|退訂|不要了/.test(s)?'cancel':/改成|改期|改為|更改|換成|修改/.test(s)?'edit':'add',reviewRequired:uncertain||/取消|更改|改期|改成|改為|換成|追加|改訂/.test(s),reason:!ctx.customer?'無法確認發言者':flexible?'跨日期任選一天，需請客人確認':unknownMultipleDates?'多個日期未清楚分配品項':!day?'取餐日期不明':'需比對原訂單',sourceIndex:ctx.sourceIndex??0,line:ctx.lineNo??0})}if(ds.length>1&&hits.length===1&&ds.every(d=>d.start<hits[0].start)&&/(?:各一|各1|各\s*1\s*(?:顆|個|份|杯)?)/.test(s)&&!/(?:任一|擇一|其中一天)/.test(s)){
-  return ds.map((d,i)=>({...result[0],date:d.date,line:ctx.lineNo*10+i,reviewRequired:true,reason:'多日期各一，請確認每一天各一筆'}))
+result.push({customer:ctx.customer||'',date:day,item:hit.item,qty:quantity,notes:s,mode:/取消|退訂|不要了/.test(s)?'cancel':/改成|改期|改為|更改|換成|修改/.test(s)?'edit':'add',reviewRequired:uncertain||/取消|更改|改期|改成|改為|換成|追加|改訂/.test(s),reason:!ctx.customer?'無法確認發言者':flexible?'跨日期任選一天，需請客人確認':unknownMultipleDates?'多個日期未清楚分配品項':!day?'取餐日期不明':'需比對原訂單',sourceIndex:ctx.sourceIndex??0,line:ctx.lineNo??0})}// Explicitly paired pickup dates before a shared item list mean EACH date gets ALL items.
+// e.g. "11/10＋11/11 咖啡核桃＋紅茶" => 4 individual order lines.
+// Distinguish this from "11/10-11/12 任一天", which remains unresolved.
+if(ds.length>1&&ds.every(d=>d.start<hits[0].start)&&
+   !/(?:任一|任一天|其中一天|擇一|隨便一天|任選)/.test(s)){
+ const prefix=s.slice(0,hits[0].start);
+ const pieces=ds.slice(0,-1).map((d,i)=>prefix.slice(d.end,ds[i+1].start).trim());
+ const explicitEach=pieces.every(c=>/^(?:[+＋、，,和與及&]|跟|以及)+$/.test(c));
+ const eachOne=hits.length===1&&/(?:各一|各1|各\s*1\s*(?:顆|個|份|杯)?)/.test(s);
+ if(explicitEach||eachOne){
+   const expanded=[];
+   for(let dayIndex=0;dayIndex<ds.length;dayIndex++){
+     for(let itemIndex=0;itemIndex<result.length;itemIndex++){
+       expanded.push({...result[itemIndex],date:ds[dayIndex].date,
+         line:ctx.lineNo*100+dayIndex*result.length+itemIndex,
+         reviewRequired:true,reason:'多個取餐日各有完整相同品項，請確認'});
+     }
+   }
+   return expanded;
+ }
 }
 return result}
 function parse(text,opts={}){const year=opts.year||new Date().getFullYear();const menu=opts.menu||[];let customer='',sourceIndex=0,date=opts.defaultDate||'',lineNo=0,skipping=false;const out=[],lines=String(text).split(/\r?\n/);
