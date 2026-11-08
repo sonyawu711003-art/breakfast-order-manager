@@ -2,7 +2,7 @@
 *{box-sizing:border-box}body{margin:0;background:#f3f8f4;color:#234d40;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}header{background:#23594a;color:white;padding:18px}header h1{font-size:21px;margin:0}main{padding:16px;max-width:780px;margin:auto}h2{font-size:18px}.card{padding:15px;background:white;border:1px solid #d9e7dd;border-radius:14px;margin:12px 0}label{font-size:13px;font-weight:650}input,select,textarea{width:100%;font-size:16px;border:1px solid #bfd2c6;border-radius:9px;padding:10px;margin:5px 0 10px}textarea{min-height:80px}button{border:none;color:white;background:#245948;border-radius:10px;padding:12px 14px;font-size:15px;font-weight:650}button:disabled{opacity:.45}.alt{background:#e9f3ec;color:#245948}.row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}.cols{display:grid;grid-template-columns:1fr 1fr;gap:9px}.hint{font-size:12px;color:#657d71}.warn{background:#fff1d8;border-radius:11px;padding:12px;font-size:13px}.red{color:#aa492a;font-size:13px}.hidden{display:none!important}a{color:#27664f}img{max-width:100%;max-height:200px;object-fit:contain}.candidate{border:1px solid #e1eae4;border-radius:12px;padding:12px;margin:12px 0}.status{white-space:pre-wrap;font-size:13px;color:#8d5333}</style></head><body>
 <header><h1>📸 吃早餐｜LINE 截圖雲端匯入</h1><small>兩位管理者共用待審核；確認後才會更新正式訂單</small></header><main>
 <p><a href="./cloud.html">← 返回雲端訂單管家</a></p>
-<div class="warn">⚠️ OCR 只能協助辨識文字，無法保證理解追加、改期、取消及加料。請逐筆核對客人、取餐日、品項、數量與備註。原始截圖會放在僅管理者可讀的私密儲存空間，審核者能查看。</div>
+<div class="warn">⚠️ 長截圖會先切成多個區段並放大文字辨識，但 OCR 仍可能漏字或錯配訊息。OCR 只能協助辨識文字，無法保證理解追加、改期、取消及加料。請逐筆核對客人、取餐日、品項、數量與備註。原始截圖會放在僅管理者可讀的私密儲存空間，審核者能查看。</div>
 <div class="card" id="access"><b>登入狀態確認中…</b></div>
 <div id="content" class="hidden">
 <div class="card"><h2>① 選擇 LINE 截圖</h2><input id="images" type="file" multiple accept="image/png,image/jpeg,image/webp"><button id="scanBtn" onclick="scanImages()">辨識截圖</button><div id="scanMsg" class="status"></div><div id="thumbnails"></div></div>
@@ -31,6 +31,19 @@ menu=m.data||[];existing=o.data||[];
 }
 async function sha256(file){const bytes=await file.arrayBuffer();const buf=await crypto.subtle.digest('SHA-256',bytes);return Array.from(new Uint8Array(buf),x=>x.toString(16).padStart(2,'0')).join('')}
 async function loadOcr(){if(window.Tesseract)return;await new Promise((ok,bad)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';s.onload=ok;s.onerror=()=>bad(new Error('文字辨識模組下載失敗'));document.head.appendChild(s)})}
+async function buildOcrTiles(file){
+ const bitmap=await createImageBitmap(file),tiles=[],chunkHeight=700,scale=bitmap.width<800?2:1;
+ for(let y=0;y<bitmap.height;y+=chunkHeight){
+   const height=Math.min(chunkHeight,bitmap.height-y);
+   const canvas=document.createElement('canvas');canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(height*scale);
+   const ctx=canvas.getContext('2d',{willReadFrequently:false});
+   ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+   ctx.imageSmoothingEnabled=true;
+   ctx.drawImage(bitmap,0,y,bitmap.width,height,0,0,canvas.width,canvas.height);
+   tiles.push(canvas);
+ }
+ bitmap.close();return tiles;
+}
 async function scanImages(){
 selectedFiles=Array.from($('images').files);if(!selectedFiles.length){alert('請先選擇截圖');return}
 if(selectedFiles.some(f=>f.size>10*1024*1024||!['image/png','image/jpeg','image/webp'].includes(f.type))){alert('每張圖片不得超過 10 MB，僅支援 PNG/JPG/WebP');return}
@@ -41,7 +54,14 @@ const worker=await Tesseract.createWorker(['chi_tra','eng'],1,{logger:x=>{if(x.s
 for(let i=0;i<selectedFiles.length;i++){
  const f=selectedFiles[i];$('scanMsg').textContent='辨識第 '+(i+1)+'／'+selectedFiles.length+' 張';
  const img=new Image();img.src=URL.createObjectURL(f);img.alt='第 '+(i+1)+' 張截圖';$('thumbnails').appendChild(img);
- fileHashes.push(await sha256(f));const result=await worker.recognize(f);fileTexts.push(result.data.text);
+ fileHashes.push(await sha256(f));
+ const tiles=await buildOcrTiles(f),parts=[];
+ for(let j=0;j<tiles.length;j++){
+  $('scanMsg').textContent='第 '+(i+1)+' 張，辨識區段 '+(j+1)+'／'+tiles.length;
+  const result=await worker.recognize(tiles[j]);parts.push(result.data.text);
+ }
+ fileTexts.push(parts.join('\n'));
+
 }
 await worker.terminate();
 $('rawText').value=fileTexts.map((t,i)=>'【截圖'+(i+1)+'】\n'+t).join('\n\n');
