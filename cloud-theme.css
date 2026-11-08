@@ -52,3 +52,7 @@ body:not(.login-mode) #printview .print-card{background:white;color:#222;box-sha
   body:not(.login-mode) #printview .print-card{width:6cm!important;padding:3mm!important;border:1px dashed #555!important;font-size:10pt!important;font-weight:bold!important;break-inside:avoid;box-shadow:none!important;margin:2mm!important}
   body:not(.login-mode) #printview h2{display:none!important}
 }
+
+body:not(.login-mode)>header .header-subline{display:flex;align-items:center;justify-content:space-between;gap:12px;max-height:62px}
+body:not(.login-mode)>header .header-subline img{width:83px;height:61px;object-fit:cover;object-position:center 36%;background:#fff4db;border:2px solid #ffe4ab;border-radius:16px;box-shadow:0 3px 9px #71341738;flex:none}
+@media(max-width:370px){body:not(.login-mode)>header .header-subline img{width:70px;height:50px}}
