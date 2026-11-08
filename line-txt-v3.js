@@ -8,6 +8,15 @@ const changeSignal=/改|換|取消|退訂|不要了|共(?:計|總)|原訂|修正
 const canon=s=>String(s||'').normalize('NFKC').replace(/[／]/g,'/').trim();
 function iso(y,m,d){const v=new Date(y,m-1,d);return v.getFullYear()===y&&v.getMonth()===m-1&&v.getDate()===d?y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0'):''}
 function plus(date,days){const d=new Date(date+'T12:00:00');if(Number.isNaN(d.getTime()))return '';d.setDate(d.getDate()+days);return iso(d.getFullYear(),d.getMonth()+1,d.getDate())}
+function messageTime24(raw){
+ const m=String(raw||'').trim().match(/^(上午|下午)?\s*(\d{1,2}):(\d{2})$/);
+ if(!m)return null;
+ let hour=Number(m[2]),minute=Number(m[3]);
+ if(minute>59||hour>(m[1]?12:23)||hour<(m[1]?1:0))return null;
+ if(m[1]==='上午')hour=hour%12;
+ else if(m[1]==='下午')hour=hour%12+12;
+ return String(hour).padStart(2,'0')+':'+String(minute).padStart(2,'0');
+}
 function parseMessages(text){
  let day='',current=null;const messages=[];
  function flush(){if(current){current.body=current.parts.join('\n').replace(/^"|"$/g,'').trim();delete current.parts;if(current.body)messages.push(current);current=null}}
@@ -26,11 +35,17 @@ function parseMessages(text){
 }
 function candidates(text,opts){
  opts=opts||{};
- const from=opts.from||'',to=opts.to||'',names=opts.menu||[];
+ const from=opts.from||'',to=opts.to||'',fromDateTime=opts.fromDateTime||'',toDateTime=opts.toDateTime||'',names=opts.menu||[];
  const messages=parseMessages(text),results=[],unresolved=[];
  const staff=new Set((opts.staff||['Sonya','老公']).map(canon));
  for(const msg of messages){
   if(!msg.posted||(from&&msg.posted<from)||(to&&msg.posted>to))continue;
+  const sentTime=messageTime24(msg.time),sentAt=sentTime?msg.posted+'T'+sentTime:null;
+  // A time-window must never silently include messages whose times are unreadable.
+  if(fromDateTime||toDateTime){
+   if(!sentAt){unresolved.push({sender:msg.sender,posted:msg.posted,time:msg.time,line:msg.line,body:msg.body,reason:'訊息時間無法判讀，未列入時段篩選'});continue}
+   if(fromDateTime&&sentAt<fromDateTime||toDateTime&&sentAt>toDateTime)continue;
+  }
   if(staff.has(canon(msg.sender)))continue;
   const raw=canon(msg.body);
   if(!raw||/^\s*\[(?:貼圖|照片|記事本|影片|檔案)\]/.test(raw))continue;
@@ -62,5 +77,5 @@ function candidates(text,opts){
  }
  return {messagesRead:messages.length,candidates:results,unresolved}
 }
-window.BreakfastLineTxt={parseMessages,candidates};
+window.BreakfastLineTxt={parseMessages,candidates,messageTime24};
 })();
