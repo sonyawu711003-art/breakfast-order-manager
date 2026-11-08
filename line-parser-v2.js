@@ -20,7 +20,28 @@ function canon(s){return normal(s).replace(/曼越梅|薑越莓/g,'蔓越莓').r
 function dates(s,year){const out=[];for(const m of String(s).matchAll(dateRE)){const y=(m[0].match(/20\d{2}/)||[])[0]||String(year);const month=+m[1],day=+m[2];const d=new Date(+y,month-1,day);if(month<1||month>12||day<1||d.getMonth()!==month-1)continue;out.push({start:m.index,end:m.index+m[0].length,date:y+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0')})}return out}
 function itemMatches(s,extra){const names=[...new Set([...catalog,...(extra||[])])].filter(Boolean).sort((a,b)=>b.length-a.length);const hits=[];for(let i=0;i<s.length;i++){const name=names.find(n=>s.startsWith(n,i));if(!name)continue;hits.push({item:name,start:i,end:i+name.length});i+=name.length-1}return hits}
 function qtyAfter(fragment){const m=fragment.match(/^\s*(?:[×xX*+]\s*(\d{1,2})|(\d{1,2})\s*(?:個|顆|份|杯|組)?(?=\s*(?:[，,、+]|$|謝謝|不加|不要|加蛋|加厚蛋)))/);return m?Number(m[1]||m[2]):1}
-function parseLine(line,ctx){const s=canon(line);const ds=dates(s,ctx.year);if(!ds.length&&!ctx.defaultDate)return [];const hits=itemMatches(s,ctx.menu);if(!hits.length)return [];
+function parseLine(line,ctx){const s=canon(line);
+ // Specific LINE order: "11/10-11/12 任一雞肉沙拉×1" means one garden salad
+ // WITH one chicken add-on on EACH consecutive date, NOT a single flexible date.
+ const chickenRange=s.match(/(?:(20\d{2})\s*[\/.年-])?(\d{1,2})\s*[\/.月]\s*(\d{1,2})\s*[-~～至到]\s*(?:(\d{1,2})\s*[\/.月])?(\d{1,2})\s*(?:日)?\s*(?:任一|任選|任何一款)?\s*(?:款|種)?\s*雞肉沙拉\s*(?:[×xX*+]\s*(\d{1,2}))?/);
+ if(chickenRange){
+  const year=+(chickenRange[1]||ctx.year),month=+chickenRange[2],start=+chickenRange[3],
+    endMonth=+(chickenRange[4]||month),end=+chickenRange[5],qty=+(chickenRange[6]||1);
+  const from=new Date(year,month-1,start),to=new Date(year,endMonth-1,end);
+  if(from.getFullYear()===year&&from.getMonth()===month-1&&from.getDate()===start&&
+    to.getFullYear()===year&&to.getMonth()===endMonth-1&&to.getDate()===end&&
+    to>=from&&(to-from)/86400000<=14&&qty>=1&&qty<=50){
+   const out=[];for(let d=new Date(from),i=0;d<=to;d.setDate(d.getDate()+1),i++){
+    const date=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    out.push({customer:ctx.customer||'',date,item:'田園沙拉',qty,
+     notes:'田園沙拉，每份加購任一款雞肉（雞肉口味待確認）；原文：'+s,
+     mode:'add',reviewRequired:true,reason:'每天各一份田園沙拉＋雞肉加購；雞肉口味及加購價待確認',
+     sourceIndex:ctx.sourceIndex??0,line:ctx.lineNo*100+i});
+   }
+   return out;
+  }
+ }
+const ds=dates(s,ctx.year);if(!ds.length&&!ctx.defaultDate)return [];const hits=itemMatches(s,ctx.menu);if(!hits.length)return [];
 const result=[];for(let i=0;i<hits.length;i++){const hit=hits[i];let day=ctx.defaultDate||'';for(const d of ds){if(d.start<hit.start)day=d.date}
 const next=hits[i+1];const quantity=qtyAfter(s.slice(hit.end,next?.start||s.length));const flexible=/(?:任一|任一天|其中一天|擇一|隨便一天)/.test(s)&&ds.length>1; if(flexible)day='';
 const unknownMultipleDates=ds.length>1&&ds.every(d=>d.start<hit.start)&&!/(?:各|每[天日])/.test(s);if(unknownMultipleDates)day='';
