@@ -22,8 +22,9 @@ function itemMatches(s,extra){const names=[...new Set([...catalog,...(extra||[])
 function qtyAfter(fragment){const m=fragment.match(/^\s*(?:[×xX*+]\s*(\d{1,2})|(\d{1,2})\s*(?:個|顆|份|杯|組))/);return m?Number(m[1]||m[2]):1}
 function parseLine(line,ctx){const s=canon(line);const ds=dates(s,ctx.year);if(!ds.length&&!ctx.defaultDate)return [];const hits=itemMatches(s,ctx.menu);if(!hits.length)return [];
 const result=[];for(let i=0;i<hits.length;i++){const hit=hits[i];let day=ctx.defaultDate||'';for(const d of ds){if(d.start<hit.start)day=d.date}
-const next=hits[i+1];const quantity=qtyAfter(s.slice(hit.end,next?.start||s.length));const uncertain=!ctx.customer||!day||!Number.isInteger(quantity)||quantity<1||quantity>50;
-result.push({customer:ctx.customer||'',date:day,item:hit.item,qty:quantity,notes:s,mode:/取消|退訂|不要了/.test(s)?'cancel':/改成|改期|改為|更改|換成|修改/.test(s)?'edit':'add',reviewRequired:uncertain||/取消|更改|改期|改成|改為|換成|追加|改訂/.test(s),reason:!ctx.customer?'無法確認發言者':!day?'取餐日期不明':'需比對原訂單',sourceIndex:ctx.sourceIndex??0,line:ctx.lineNo??0})}return result}
+const next=hits[i+1];const quantity=qtyAfter(s.slice(hit.end,next?.start||s.length));const flexible=/(?:任一|任一天|其中一天|擇一|隨便一天)/.test(s)&&ds.length>1; if(flexible)day='';
+const uncertain=!ctx.customer||!day||!Number.isInteger(quantity)||quantity<1||quantity>50;
+result.push({customer:ctx.customer||'',date:day,item:hit.item,qty:quantity,notes:s,mode:/取消|退訂|不要了/.test(s)?'cancel':/改成|改期|改為|更改|換成|修改/.test(s)?'edit':'add',reviewRequired:uncertain||/取消|更改|改期|改成|改為|換成|追加|改訂/.test(s),reason:!ctx.customer?'無法確認發言者':flexible?'跨日期任選一天，需請客人確認':!day?'取餐日期不明':'需比對原訂單',sourceIndex:ctx.sourceIndex??0,line:ctx.lineNo??0})}return result}
 function parse(text,opts={}){const year=opts.year||new Date().getFullYear();const menu=opts.menu||[];let customer='',sourceIndex=0,date=opts.defaultDate||'',lineNo=0,skipping=false;const out=[],lines=String(text).split(/\r?\n/);
 for(let i=0;i<lines.length;i++){lineNo=i;const s=canon(lines[i]);if(!s)continue;const src=s.match(/^【截圖\s*(\d+)】/);if(src){sourceIndex=+src[1]-1;customer='';date=opts.defaultDate||'';skipping=false;continue}
 if(/吃早餐\s*[|｜]/.test(s)&&/口味|NEW|下週|預訂|限量/.test(s)){skipping=true;customer='';continue}
@@ -33,7 +34,7 @@ const nameHeader=s.match(/^(?:\d{1,2}:\d{2}\s*)?([^\d:：\s][^:：\n]{1,23})\s*[
 if(nameHeader&&!itemMatches(nameHeader[1],menu).length){customer=nameHeader[1].trim();if(!nameHeader[2])continue;out.push(...parseLine(nameHeader[2],{year,menu,customer,sourceIndex,defaultDate:date,lineNo}));continue}
 // If a line is only a display name, it is too easy to mistake product words for names.
 // Keep the name only when the next line clearly contains a date and item.
-if(!dates(s,year).length&&!itemMatches(s,menu).length&&s.length<=25&&/[一-龥A-Za-z]/.test(s)&&!/^上午|下午/.test(s)){const next=canon(lines[i+1]||'');if(dates(next,year).length&&itemMatches(next,menu).length){customer=s;continue}}
+if(!dates(s,year).length&&!itemMatches(s,menu).length&&s.length<=25&&/[一-龥A-Za-z]/.test(s)&&!/^上午|下午/.test(s)){const next=canon(lines[i+1]||'');if((dates(next,year).length&&itemMatches(next,menu).length)||(dates(next,year).length&&itemMatches(canon(lines[i+2]||''),menu).length)){customer=s;continue}}
 const d=dates(s,year);if(d.length)date=d[d.length-1].date;
 out.push(...parseLine(s,{year,menu,customer,sourceIndex,defaultDate:date,lineNo}));
 }
