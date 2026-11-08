@@ -1,6 +1,6 @@
-/* Source: uploaded Google Business menu Excel (62 items) plus 3 products from 2026-11-04 photos.
- price = current member/offer price where known; regular_price = published standard price or null.
- New-item photo prices are TRIAL prices, not assumed permanent prices. */
+/* Source: Google Business menu workbook (62) + three 2026-11-04 photo trial products.
+ Photo handwritten name corrected by owner: 布里歐帕瑪森-奶油蒜香菲力雞 $75.
+ price=trial/member known amount; regular_price=null if not published. */
 window.BREAKFAST_GOOGLE_MENU_20261108=[
   {
     "category": "三明治",
@@ -500,10 +500,10 @@ window.BREAKFAST_GOOGLE_MENU_20261108=[
   },
   {
     "category": "歐式",
-    "name": "布里歐帕瑪森（手寫副名待確認）",
+    "name": "布里歐帕瑪森-奶油蒜香菲力雞",
     "price": 75,
     "regular_price": null,
-    "description": "2026/11/04 照片新品試吃價 $75；手寫第二行品名待確認，一般正式售價未公布。",
+    "description": "奶油蒜香菲力雞布里歐帕瑪森；2026/11/04 新品試吃價 $75，正式一般售價尚未公布。",
     "active": true
   },
   {
