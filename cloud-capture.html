@@ -9,7 +9,7 @@
 <div class="card"><h2>② 核對原始文字</h2><p class="hint">更推薦直接匯入 LINE 匯出的聊天紀錄 TXT，可保留原本的發言人與時間；若只有照片，仍可用上方 OCR。</p><label>LINE 聊天紀錄 TXT（可選）<input type="file" id="chatTxt" accept=".txt,text/plain"></label><div class="cols"><label>訊息起始日期<input id="txtFrom" type="date"></label><label>訊息起始時間<input id="txtFromTime" type="time" value="00:00" step="60"></label><label>訊息結束日期<input id="txtTo" type="date"></label><label>訊息結束時間<input id="txtToTime" type="time" value="23:59" step="60"></label></div><p class="hint">依 LINE 訊息「發送日期＋時間」篩選，非取餐日期。起迄時間都包含在內，適合分批補讀新訂單；重複訊息送審時仍會嘗試排除。</p><button class="alt" onclick="importChatTxt()">讀取 TXT 原始訊息</button><p class="hint">可貼上 LINE 匯出的文字，也可直接改正 OCR 內容。識別結果還不是正式訂單。</p><textarea rows="9" id="rawText" placeholder="可先選擇截圖辨識，或貼上 LINE 原始對話"></textarea><label>預設取餐日期（無法辨識時用）<input type="date" id="defaultDate"></label><button onclick="extractCandidates()">從文字產生候選單</button> <button class="alt" onclick="addCandidate()">手動新增一筆候選</button></div>
 <div class="card"><h2>③ 依客人＋取餐日整單確認</h2><p class="hint">客人可使用簡稱，系統會對照正式菜單；若簡稱對應多款商品，先選正確品項。✅ <strong>品項小計＝數量 × 單價，系統自動計算</strong>，只有特殊折扣或組合優惠才需展開「特別總額」手動修改。</p><div id="candidates"></div><button id="send" onclick="sendToCloud()">送出勾選的候選單至共同審核</button><p id="sendMsg" class="status"></p></div>
 </div></main>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script><script src="./cloud-config.js"></script><script src="./line-parser-v2.js"></script><script src="./line-txt-v3.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script><script src="./cloud-config.js"></script><script src="./line-parser-v2.js?v=20261109-fiveitems1"></script><script src="./line-txt-v3.js"></script>
 <script>
 let api=null,user=null,menu=[],existing=[],proposals=[],selectedFiles=[],fileHashes=[],fileTexts=[],currentSource='image';
 const $=id=>document.getElementById(id);
@@ -31,6 +31,7 @@ const itemAliases={
  '抹茶卡士達貝果':['抹茶卡士達'],
  '牛奶芝麻奶霜貝果':['牛奶芝麻奶霜'],
  '白玉紅豆抹茶貝果':['白玉紅豆抹茶'],
+ '玫瑰蔓越莓紅寶石':['蔓越莓紅寶石','蔓越莓玫瑰紅寶石','蔓越莓玫瑰'],
  '起司三重奏':['起司三重奏'],
  '古早味紅茶':['紅茶','古早味紅茶'],
  '田園蔬果沙拉':['田園沙拉']
