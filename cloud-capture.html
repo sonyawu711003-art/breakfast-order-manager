@@ -9,7 +9,7 @@
 <div class="card"><h2>② 核對原始文字</h2><p class="hint">可貼上 LINE 匯出的文字，也可直接改正 OCR 內容。識別結果還不是正式訂單。</p><textarea rows="9" id="rawText" placeholder="可先選擇截圖辨識，或貼上 LINE 原始對話"></textarea><label>預設取餐日期（無法辨識時用）<input type="date" id="defaultDate"></label><button onclick="extractCandidates()">從文字產生候選單</button> <button class="alt" onclick="addCandidate()">手動新增一筆候選</button></div>
 <div class="card"><h2>③ 人工確認候選訂單</h2><p class="hint">姓名、日期、價格可能辨識錯誤；新增會檢查相似既有單。修改與取消必須選擇原訂單。標示為待處理後，兩位管理者都能在共同審核頁確認。</p><div id="candidates"></div><button id="send" onclick="sendToCloud()">送出勾選的候選單至共同審核</button><p id="sendMsg" class="status"></p></div>
 </div></main>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script><script src="./cloud-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script><script src="./cloud-config.js"></script><script src="./line-parser-v2.js"></script>
 <script>
 let api=null,user=null,menu=[],existing=[],proposals=[],selectedFiles=[],fileHashes=[],fileTexts=[];
 const $=id=>document.getElementById(id);
@@ -52,33 +52,21 @@ finally{$('scanBtn').disabled=false}
 function newCandidate(data={}){return {check:false,customer:'',date:$('defaultDate').value,item:'',qty:1,price:'',total:'',notes:'',mode:'add',target:'',sourceIndex:0,line:0,...data}}
 function extractCandidates(){
 const raw=$('rawText').value;if(!raw.trim()){alert('請先辨識或貼上文字');return}
-proposals=[];let date=$('defaultDate').value,customer='',sourceIndex=0;
-const lines=raw.split(/\r?\n/);
-lines.forEach((v,i)=>{const line=v.trim();if(!line)return;
-const source=line.match(/^【截圖(\d+)】/);if(source){sourceIndex=Number(source[1])-1;return}
-const d=localDate(line);if(d)date=d;
-const name=line.match(/^([^\s:：]{2,25})\s*[:：]\s*/);if(name&&!categories.some(k=>name[1].includes(k)))customer=name[1];
-const match=categories.filter(s=>line.includes(s)).sort((a,b)=>b.length-a.length)[0];if(!match)return;
-const ix=line.indexOf(match),tail=line.slice(ix+match.length);
-const q=tail.match(/[xX×*]\s*(\d{1,2})|(\d{1,2})\s*(?:顆|個|份|杯)/);
-const qty=q?Number(q[1]||q[2]):1;
-const m=menu.find(x=>x.name===match);
-const flag=/取消|改成|改期|更改|修改|換成|退訂/.test(line);
-proposals.push(newCandidate({customer,date,item:match,qty,price:m?.price??'',notes:line,mode:flag?'edit':'add',sourceIndex,line:i}));
-});
-if(!proposals.length)proposals=[newCandidate({notes:raw.slice(0,500),sourceIndex:0})];
+const parsed=window.BreakfastLineParser.parse(raw,{year:new Date().getFullYear(),defaultDate:$('defaultDate').value,menu:menu.map(m=>m.name)});
+proposals=parsed.map(p=>newCandidate({customer:p.customer,date:p.date,item:p.item,qty:p.qty,price:menu.find(m=>m.name===p.item)?.price??'',notes:p.notes,mode:p.mode,sourceIndex:p.sourceIndex,line:p.line,flag:p.reviewRequired,reason:p.reason}));
+if(!proposals.length)proposals=[newCandidate({notes:raw.slice(0,500),flag:true,reason:'無法可靠判讀，請手動建立候選訂單',line:100000})];
 drawCandidates();
 }
 function addCandidate(){proposals.push(newCandidate({line:100000+proposals.length}));drawCandidates()}
 function targetOptions(value){return '<option value="">請選擇要更改／取消的原訂單</option>'+existing.map(o=>'<option value="'+o.id+'" '+(value===o.id?'selected':'')+'>'+esc(o.pickup_date+'｜'+o.customer+'｜'+o.item+' ×'+o.quantity)+'</option>').join('')}
 function drawCandidates(){
-$('candidates').innerHTML=proposals.map((p,i)=>'<div class="candidate"><label><input type="checkbox" data-i="'+i+'" data-k="check" style="width:auto;display:inline" '+(p.check?'checked':'')+'> 確認送共同審核</label><div class="cols"><label>客人<input data-i="'+i+'" data-k="customer" value="'+esc(p.customer)+'"></label><label>取餐日<input type="date" data-i="'+i+'" data-k="date" value="'+esc(p.date)+'"></label><label>品項<input data-i="'+i+'" data-k="item" value="'+esc(p.item)+'"></label><label>數量<input type="number" min="1" max="999" data-i="'+i+'" data-k="qty" value="'+p.qty+'"></label><label>單價（可修改）<input type="number" step=".01" min="0" data-i="'+i+'" data-k="price" value="'+esc(p.price)+'"></label><label>手動總額（可留白）<input type="number" step=".01" min="0" data-i="'+i+'" data-k="total" value="'+esc(p.total)+'"></label></div><label>異動類型<select data-i="'+i+'" data-k="mode"><option value="add" '+(p.mode==='add'?'selected':'')+'>新增</option><option value="edit" '+(p.mode==='edit'?'selected':'')+'>修改原訂單</option><option value="cancel" '+(p.mode==='cancel'?'selected':'')+'>取消原訂單</option></select></label><label>如為修改或取消，請選擇原訂單<select data-i="'+i+'" data-k="target">'+targetOptions(p.target)+'</select></label><label>原訊息／客製要求<textarea rows="3" data-i="'+i+'" data-k="notes">'+esc(p.notes)+'</textarea></label><div class="hint">預估：'+(p.total!==''?money(p.total):p.price!==''?money(Number(p.price)*p.qty):'未定價')+'；候選單可能辨識錯誤，請人工核對。</div><button class="alt" data-remove="'+i+'">移除此候選</button></div>').join('')||'<p class="hint">尚無候選訂單</p>';
+$('candidates').innerHTML=proposals.map((p,i)=>'<div class="candidate"><label><input type="checkbox" data-i="'+i+'" data-k="check" style="width:auto;display:inline" '+(p.check?'checked':'')+'> 確認送共同審核</label><div class="cols"><label>客人<input data-i="'+i+'" data-k="customer" value="'+esc(p.customer)+'"></label><label>取餐日<input type="date" data-i="'+i+'" data-k="date" value="'+esc(p.date)+'"></label><label>品項<input data-i="'+i+'" data-k="item" value="'+esc(p.item)+'"></label><label>數量<input type="number" min="1" max="999" data-i="'+i+'" data-k="qty" value="'+p.qty+'"></label><label>單價（可修改）<input type="number" step=".01" min="0" data-i="'+i+'" data-k="price" value="'+esc(p.price)+'"></label><label>手動總額（可留白）<input type="number" step=".01" min="0" data-i="'+i+'" data-k="total" value="'+esc(p.total)+'"></label></div><label>異動類型<select data-i="'+i+'" data-k="mode"><option value="add" '+(p.mode==='add'?'selected':'')+'>新增</option><option value="edit" '+(p.mode==='edit'?'selected':'')+'>修改原訂單</option><option value="cancel" '+(p.mode==='cancel'?'selected':'')+'>取消原訂單</option></select></label><label>如為修改或取消，請選擇原訂單<select data-i="'+i+'" data-k="target">'+targetOptions(p.target)+'</select></label><label>原訊息／客製要求<textarea rows="3" data-i="'+i+'" data-k="notes">'+esc(p.notes)+'</textarea></label><div class="red">系統提示：'+(p.flag?'⚠️ '+esc(p.reason||'需要人工核對'):'仍請核對姓名、日期、品項及數量')+'</div><div class="hint">預估：'+(p.total!==''?money(p.total):p.price!==''?money(Number(p.price)*p.qty):'未定價')+'；候選單可能辨識錯誤，請人工核對。</div><button class="alt" data-remove="'+i+'">移除此候選</button></div>').join('')||'<p class="hint">尚無候選訂單</p>';
 $('candidates').querySelectorAll('[data-i]').forEach(n=>n.addEventListener(n.type==='checkbox'?'change':'input',()=>{const p=proposals[Number(n.dataset.i)];const k=n.dataset.k;p[k]=k==='check'?n.checked:k==='qty'?Number(n.value):n.value}));
 $('candidates').querySelectorAll('[data-remove]').forEach(n=>n.onclick=()=>{proposals.splice(Number(n.dataset.remove),1);drawCandidates()});
 $('sendMsg').textContent='共有 '+proposals.length+' 筆候選，尚未更新正式訂單。';
 }
 async function sendToCloud(){
-const chosen=proposals.filter(p=>p.check);if(!chosen.length){alert('請先勾選並校正至少一筆候選單');return}
+const chosen=proposals.filter(p=>p.check);if(chosen.some(p=>!p.customer||!p.date)){alert('部分候選單尚無客人姓名或日期，請對照 LINE 截圖手動填妥，不能直接送審。');return}if(!chosen.length){alert('請先勾選並校正至少一筆候選單');return}
 for(const p of chosen){
 if(!p.customer.trim()||!p.item.trim()||!p.date||!Number.isInteger(p.qty)||p.qty<1){alert('客人、日期、品項或數量未填妥');return}
 if(['edit','cancel'].includes(p.mode)&&!p.target){alert('修改／取消必須選擇原訂單');return}
