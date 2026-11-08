@@ -6,7 +6,7 @@
 <div class="card" id="access"><b>登入狀態確認中…</b></div>
 <div id="content" class="hidden">
 <div class="card"><h2>① 選擇 LINE 截圖</h2><input id="images" type="file" multiple accept="image/png,image/jpeg,image/webp"><button id="scanBtn" onclick="scanImages()">辨識截圖</button><div id="scanMsg" class="status"></div><div id="thumbnails"></div></div>
-<div class="card"><h2>② 核對原始文字</h2><p class="hint">可貼上 LINE 匯出的文字，也可直接改正 OCR 內容。識別結果還不是正式訂單。</p><textarea rows="9" id="rawText" placeholder="可先選擇截圖辨識，或貼上 LINE 原始對話"></textarea><label>預設取餐日期（無法辨識時用）<input type="date" id="defaultDate"></label><button onclick="extractCandidates()">從文字產生候選單</button> <button class="alt" onclick="addCandidate()">手動新增一筆候選</button></div>
+<div class="card"><h2>② 核對原始文字</h2><p class="hint">更推薦直接匯入 LINE 匯出的聊天紀錄 TXT，可保留原本的發言人與時間；若只有照片，仍可用上方 OCR。</p><label>LINE 聊天紀錄 TXT（可選）<input type="file" id="chatTxt" accept=".txt,text/plain"></label><button class="alt" onclick="importChatTxt()">讀取 TXT 原始訊息</button><p class="hint">可貼上 LINE 匯出的文字，也可直接改正 OCR 內容。識別結果還不是正式訂單。</p><textarea rows="9" id="rawText" placeholder="可先選擇截圖辨識，或貼上 LINE 原始對話"></textarea><label>預設取餐日期（無法辨識時用）<input type="date" id="defaultDate"></label><button onclick="extractCandidates()">從文字產生候選單</button> <button class="alt" onclick="addCandidate()">手動新增一筆候選</button></div>
 <div class="card"><h2>③ 人工確認候選訂單</h2><p class="hint">姓名、日期、價格可能辨識錯誤；新增會檢查相似既有單。修改與取消必須選擇原訂單。標示為待處理後，兩位管理者都能在共同審核頁確認。</p><div id="candidates"></div><button id="send" onclick="sendToCloud()">送出勾選的候選單至共同審核</button><p id="sendMsg" class="status"></p></div>
 </div></main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script><script src="./cloud-config.js"></script><script src="./line-parser-v2.js"></script>
@@ -68,6 +68,15 @@ $('rawText').value=fileTexts.map((t,i)=>'【截圖'+(i+1)+'】\n'+t).join('\n\n'
 $('scanMsg').textContent='已辨識 '+selectedFiles.length+' 張。請核對文字。';
 }catch(e){$('scanMsg').textContent='辨識失敗：'+e.message+'。可改為貼上原始對話文字。'}
 finally{$('scanBtn').disabled=false}
+}
+async function importChatTxt(){
+ const f=$('chatTxt').files?.[0];
+ if(!f){alert('請先選擇 LINE 聊天紀錄 TXT');return}
+ if(f.size>5*1024*1024){alert('TXT 超過 5MB，請先分段匯出');return}
+ let t=await f.text();
+ if(t.includes('\ufffd')){$('scanMsg').textContent='文字檔可能不是 UTF-8 編碼，請先檢查中文是否正常顯示。'}
+ $('rawText').value=t;selectedFiles=[];fileHashes=[];fileTexts=[];
+ $('scanMsg').textContent='已匯入 LINE TXT '+f.name+'，請先核對再產生候選單。';
 }
 function newCandidate(data={}){return {check:false,customer:'',date:$('defaultDate').value,item:'',qty:1,price:'',total:'',notes:'',mode:'add',target:'',sourceIndex:0,line:0,...data}}
 function extractCandidates(){
