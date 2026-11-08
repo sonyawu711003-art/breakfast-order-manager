@@ -20,7 +20,7 @@ const categories=['巧克力藍莓乳酪','南瓜焦糖乳酪','鐵觀音桂圓'
 const itemAliases={
  '咖啡核桃貝果':['咖啡核桃'],
  '抹茶開心果貝果':['抹茶開心果'],
- '大甲香芋貝果':['大甲芋頭','大甲香芋','芋頭'],
+ '大甲香芋貝果':['大甲芋頭','大甲香芋'],
  '原味炙燒北海道明太子貝果':['原味明太子','原味炙燒明太子'],
  '巧克力藍莓乳酪貝果':['巧克力藍莓','巧克力藍莓乳酪'],
  '南瓜焦糖乳酪貝果':['南瓜焦糖','南瓜焦糖乳酪'],
@@ -39,6 +39,8 @@ function itemKey(v){return String(v||'').normalize('NFKC').toLowerCase().replace
 function catalogCandidates(v){
  const key=itemKey(v);if(!key)return [];
  const active=menu.filter(m=>m.active!==false);
+ // General shorthand "芋頭" may refer to a bagel or dessert; require human choice.
+ if(key==='芋頭')return active.filter(m=>/大甲香芋|芋頭|芋見/.test(m.name));
  const byKeys=fn=>active.filter(fn);
  let hits=byKeys(m=>itemKey(m.name)===key);
  if(hits.length)return hits;
