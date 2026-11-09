@@ -178,13 +178,13 @@ function drawMealStats(dates,groups){
    day.total+=subtotal;
    day.sections.push('<h4 class="row"><span>'+label+'</span><span>'+subtotal+' '+unit+'</span></h4>'+lines);
   }
-  const quantity=sumQuantity(orders);
+  const quantity=sumQuantity(orders.filter(x=>days.has(x.pickup_date)));
   total+=quantity;
   return '<span>'+label+' '+quantity+' '+unit+'</span>';
  }).join('');
  const daily=[...days].map(([date,day])=>'<section class="card"><div class="row"><strong>'+htmlEscape(date)+
   '</strong><strong>當日小計 '+day.total+' 件</strong></div>'+day.sections.join('')+'</section>').join('');
- $('mealStats').innerHTML='<div class="card"><div class="row"><strong>全部日期總計</strong><strong>'+
+ $('mealStats').innerHTML='<div class="card"><div class="row"><strong>'+(dates.length===1?'所選日期總計':'全部日期總計')+'</strong><strong>'+
   total+' 件</strong></div><div class="row hint">'+totals+'</div></div>'+
   (daily||'<p class="hint">目前沒有有效訂單</p>');
 }
