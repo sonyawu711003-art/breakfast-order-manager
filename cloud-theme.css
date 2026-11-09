@@ -56,3 +56,16 @@ body:not(.login-mode) #printview .print-card{background:white;color:#222;box-sha
 body:not(.login-mode)>header .header-subline{display:flex;align-items:center;justify-content:space-between;gap:12px;max-height:62px}
 body:not(.login-mode)>header .header-subline img{width:83px;height:61px;object-fit:cover;object-position:center 36%;background:#fff4db;border:2px solid #ffe4ab;border-radius:16px;box-shadow:0 3px 9px #71341738;flex:none}
 @media(max-width:370px){body:not(.login-mode)>header .header-subline img{width:70px;height:50px}}
+
+/* 一位客人、同一取餐日，維持同張訂單卡編輯所有品項。 */
+#orderList .customer-order-card{border:2px solid #eccda2;background:#fffdf7;padding:17px;margin:14px 0;border-radius:22px;box-shadow:0 7px 19px #b9753c17}
+.customer-order-card h3{margin:2px 0 6px;font-size:20px;color:#803c1f}
+.customer-order-amount{font-size:19px;color:#ab612b;background:#fff0d1;padding:9px 12px;border-radius:13px}
+.customer-order-lines{margin:12px 0}
+.customer-order-card .order-group-line{background:#fff8ec;border:1px solid #efdfc5;border-radius:15px;padding:13px;margin:9px 0}
+.customer-order-card .order-group-line.group-cancelled{opacity:.62;background:#f7f0e8}
+.customer-order-card .order-group-line .row{gap:8px}
+.customer-order-card .order-group-line button{padding:8px 12px;min-height:38px;font-size:13px}
+.customer-order-card>button{width:100%;margin-top:5px}
+#orderGroupInfo:not(.hidden){background:#fff3d7;border:1px solid #eed1a6;border-radius:12px;padding:11px 12px;font-weight:700}
+#orderForm input[readonly]{background:#f6eede!important;color:#70513a!important}
