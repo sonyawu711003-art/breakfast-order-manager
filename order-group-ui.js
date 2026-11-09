@@ -46,6 +46,7 @@ window.startOrderItemById=function(id){
  const x=orders.find(row=>row.id===id&&row.status==='active');
  if(!x)return;
  if(typeof orderSaving!=='undefined'&&orderSaving)return;
+ if(typeof editDirty!=='undefined'&&editDirty&&!confirm('目前有尚未儲存的品項修改，要捨棄後改為追加品項嗎？'))return;
  startOrderItem(x.customer,x.pickup_date);
  jumpToForm();
 };
