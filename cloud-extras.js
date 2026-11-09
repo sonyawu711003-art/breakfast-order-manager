@@ -103,7 +103,25 @@ const r=id?await client.from('breakfast_menu').update(rec).eq('id',id).select('i
 function editMenu(id){const m=menuRows.find(x=>x.id===id);if(!m)return;tab('menuScreen');document.getElementById('menuId').value=m.id;document.getElementById('menuName').value=m.name;document.getElementById('menuCategory').value=m.category;document.getElementById('menuPrice').value=m.price===null?'':m.price;document.getElementById('menuRegularPrice').value=m.regular_price??'';document.getElementById('menuDescription').value=m.description??'';document.getElementById('menuActive').checked=m.active;updateMenuPriceLabels();window.scrollTo(0,0)}
 function drawMenu(){const q=document.getElementById('menuSearch').value.toLowerCase();document.getElementById('menuList').innerHTML=menuRows.filter(m=>(m.name+m.category).toLowerCase().includes(q)).map(m=>'<div class="card row"><span><b>'+htmlEscape(m.name)+'</b> <span class="hint">'+htmlEscape(m.category)+'</span><br>'+menuPriceCaption(m)+(m.description?'<p class="hint">'+htmlEscape(m.description)+'</p>':'')+(m.active?'':'（停用）')+'</span><button class="secondary" data-m="'+m.id+'">修改</button></div>').join('')||'<p>尚無菜單資料</p>';document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>editMenu(b.dataset.m));
 const select=document.getElementById('menuChooser'),prev=select.value;select.innerHTML='<option value="">可挑選菜單或手動輸入品名</option>'+menuRows.filter(m=>m.active).map(m=>'<option value="'+m.id+'">'+htmlEscape(m.category)+'｜'+htmlEscape(m.name)+' '+menuPriceCaption(m)+'</option>').join('');select.value=prev}
-async function refreshExtras(){if(!client||!session)return;const [a,b]=await Promise.all([client.from('breakfast_menu').select('*').order('category').order('name'),client.from('breakfast_proposals').select('*').order('submitted_at',{ascending:false}).limit(300)]);if(a.error||b.error){window.BREAKFAST_UPGRADE_READY=false;const msg=a.error?.message||b.error?.message;document.getElementById('proposalList').textContent='請先執行 Supabase 升級 SQL：'+msg;document.getElementById('menuList').textContent='菜單表尚未建立';return}window.BREAKFAST_UPGRADE_READY=true;menuRows=a.data||[];proposalRows=b.data||[];drawMenu();drawProposals();previewAmount()}
+async function refreshExtras(){
+ if(!client||!session)return;
+ const currentSession=session;
+ const [menu,proposals]=await Promise.all([
+  client.from('breakfast_menu').select('*').order('category').order('name'),
+  client.from('breakfast_proposals').select('*').order('submitted_at',{ascending:false}).limit(300)
+ ]);
+ if(session!==currentSession)return;
+ if(!menu.error){menuRows=menu.data||[];draw()}
+ if(menu.error||proposals.error){
+  window.BREAKFAST_UPGRADE_READY=false;
+  document.getElementById('proposalList').textContent='請先執行 Supabase 升級 SQL：'+(menu.error?.message||proposals.error.message);
+  document.getElementById('menuList').textContent='菜單表尚未建立';
+  return;
+ }
+ window.BREAKFAST_UPGRADE_READY=true;
+ proposalRows=proposals.data||[];
+ drawMenu();drawProposals();previewAmount();
+}
 function groupPendingProposals(){
  const groups=new Map();
  for(const p of proposalRows.filter(p=>p.status==='pending')){

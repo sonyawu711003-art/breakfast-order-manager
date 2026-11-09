@@ -44,7 +44,7 @@ body.login-mode>.wrap{max-width:530px;padding:clamp(12px,3vw,24px);margin:0 auto
 <p class="privacy-note">🔒 兩位管理者使用自己的帳號登入，共用同一份雲端資料</p></div>
 <div id="passwordCard" class="card hidden"><h2>🔑 完成帳號啟用／設定新密碼</h2><p class="hint">從 Supabase 邀請信或密碼重設信進入時，請為自己的管理者帳號設定密碼（至少 12 個字元）。</p><form id="newPasswordForm"><label>新密碼<input id="newPassword" type="password" autocomplete="new-password" minlength="12" required></label><label>再次輸入新密碼<input id="confirmPassword" type="password" autocomplete="new-password" minlength="12" required></label><button type="submit">設定新密碼</button></form><p id="passwordMsg" class="status"></p></div><div id="main" class="hidden">
 <div class="card row"><b id="syncStatus">正在連接雲端…</b><div><button class="secondary" onclick="reload()">同步資料</button> <button class="secondary" onclick="signOut()">登出</button></div></div>
-<div id="dashboard" class="screen"><h2>📊 製作統計</h2><label>取餐日期<select id="dateFilter" onchange="draw()"></select></label><div class="counts" id="cards"></div><h3>貝果口味</h3><div id="bagelStats"></div><h3>其他餐點</h3><div id="otherStats"></div></div>
+<div id="dashboard" class="screen"><h2>📊 製作統計</h2><label>取餐日期<select id="dateFilter" onchange="draw()"></select></label><div class="counts" id="cards"></div><h3>貝果統計</h3><div id="bagelStats" aria-live="polite"></div><h3>其他餐點</h3><div id="otherStats"></div></div>
 <div id="manage" class="screen hidden"><h2>📝 共同訂單</h2><input id="search" placeholder="搜尋客人或品項" oninput="draw()"><div class="card" id="orderList"></div><div class="card"><h3 id="formTitle">新增訂單</h3><form id="orderForm"><input id="editId" type="hidden"><input id="editVersion" type="hidden"><label>客人名稱<input id="customer" required maxlength="100"></label><label>取餐日期<input id="pickup" type="date" required></label><label>品項<input id="item" required maxlength="200"></label><div class="grid"><label>數量<input id="qty" type="number" min="1" max="999" value="1" required></label><label>單價（可空白）<input id="price" type="number" min="0" step=".01"></label></div><label>客製備註<textarea id="notes" rows="3"></textarea></label><button type="submit">確認儲存至雲端</button> <button type="button" class="secondary" onclick="clearForm()">清除</button></form></div></div>
 <div id="printview" class="screen hidden"><h2>🖨️ 訂單卡</h2><div class="no-print"><button onclick="window.print()">A4 列印／儲存 PDF</button><p class="hint">6 公分寬、10pt 粗體，一位客人每天一張。</p></div><div id="printCards"></div></div>
 <div id="history" class="screen hidden"><h2>🕘 操作紀錄與備份</h2><button onclick="loadAudit()">載入最新異動</button> <button class="secondary" onclick="downloadCsv()">匯出目前訂單 CSV</button><div id="auditList" class="card"></div><p class="hint">所有更新都由伺服器留下操作者與時間。取消訂單採保留紀錄方式，不會直接刪除。</p></div>
@@ -54,6 +54,7 @@ body.login-mode>.wrap{max-width:530px;padding:clamp(12px,3vw,24px);margin:0 auto
 <script src="./cloud-config.js"></script>
 <script>
 let client=null,session=null,orders=[],subscription=null,refreshTimer=null;
+let orderRefresh=0;
 const $=x=>document.getElementById(x);
 $('togglePassword').addEventListener('click',()=>{const input=$('password');const visible=input.type==='password';input.type=visible?'text':'password';$('togglePassword').textContent=visible?'隱藏':'顯示';$('togglePassword').setAttribute('aria-pressed',String(visible));$('togglePassword').setAttribute('aria-label',visible?'隱藏密碼':'顯示密碼')});
 const htmlEscape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -91,14 +92,95 @@ $('loginForm').addEventListener('submit',async e=>{e.preventDefault();if(!client
 function showPasswordSetup(){document.body.classList.remove('login-mode');$('passwordCard').classList.remove('hidden');$('loginCard').classList.add('hidden');$('main').classList.add('hidden');$('nav').classList.add('hidden')}
 $('newPasswordForm').addEventListener('submit',async e=>{e.preventDefault();if(!client)return;const p=$('newPassword').value;if(p.length<12||p!==$('confirmPassword').value){$('passwordMsg').textContent='兩次密碼不一致，或密碼少於 12 個字元';return}const {error}=await client.auth.updateUser({password:p});if(error){$('passwordMsg').textContent='設定失敗：'+error.message;return}$('passwordMsg').textContent='密碼設定成功';$('newPasswordForm').reset();$('passwordCard').classList.add('hidden');history.replaceState(null,'',location.pathname);const {data}=await client.auth.getSession();await setSession(data.session)});
 async function signOut(){if(client)await client.auth.signOut()}
-async function reload(){if(!session||!client)return;const {data,error}=await client.from('breakfast_orders').select('*').order('pickup_date',{ascending:true}).order('created_at',{ascending:true}).limit(5000);if(error){info('同步失敗：'+error.message);return}orders=data||[];info('✅ 已同步 '+orders.length+' 筆｜'+new Date().toLocaleTimeString('zh-TW'));draw()}
+async function reload(){
+ if(!session||!client)return;
+ const request=++orderRefresh,currentSession=session;
+ const rows=[];
+ let lastId;
+ do{
+  let query=client.from('breakfast_orders').select('*').order('id').limit(1000);
+  if(lastId)query=query.gt('id',lastId);
+  const {data,error}=await query;
+  if(request!==orderRefresh||session!==currentSession)return;
+  if(error){info('同步失敗：'+error.message);return}
+  rows.push(...(data||[]));
+  lastId=data?.at(-1)?.id;
+ }while(lastId);
+ orders=rows.sort((a,b)=>a.pickup_date.localeCompare(b.pickup_date)||a.created_at.localeCompare(b.created_at));
+ info('✅ 已同步 '+orders.length+' 筆｜'+new Date().toLocaleTimeString('zh-TW'));
+ draw();
+}
 function tab(name){document.querySelectorAll('.screen').forEach(e=>e.classList.toggle('hidden',e.id!==name));document.querySelectorAll('#nav button').forEach(b=>{const match=b.getAttribute('onclick')?.includes("tab('"+name+"')");if(match)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});if(name==='printview')draw();if(name==='history')loadAudit()}
+// Historical orders store item text. Resolve only explicit names and known, unambiguous aliases.
+const bagelAliases={
+ '原味炙燒北海道明太子貝果':['原味明太子','原味炙燒明太子'],
+ '火山炙燒北海道明太子貝果':['火山明太子','火山炙燒明太子'],
+ '大甲香芋貝果':['大甲芋頭'],
+ '巧克力藍莓乳酪貝果':['巧克力藍莓'],
+ '南瓜焦糖乳酪貝果':['南瓜焦糖'],
+ '巧克力阿華田貝果':['阿華田'],
+ '玫瑰蔓越莓紅寶石':['蔓越莓紅寶石','蔓越莓玫瑰紅寶石','蔓越莓玫瑰'],
+ '流沙乳酪碳金貝果':['碳金流沙','流金碳沙','流金碳砂','流金鹹沙','碳金流砂']
+};
+const statsItemKey=name=>name.normalize('NFKC').toLowerCase().replace(/\s+/g,'').replace(/蔓越梅|蔓越苺|曼越梅|曼越莓|薑越莓/g,'蔓越莓');
+function bagelNameLookup(){
+ const baseline=window.BREAKFAST_GOOGLE_MENU_20261108||[];
+ const live=typeof menuRows==='undefined'?[]:menuRows;
+ const officialKeys=new Set(baseline.map(item=>statsItemKey(item.name)));
+ const catalog=new Map([...baseline,...live].map(item=>[statsItemKey(item.name),item]));
+ const aliases=new Map();
+ for(const item of catalog.values()){
+  if(item.category!=='貝果')continue;
+  const shortName=item.name.replace(/貝果$/,'');
+  const historical=bagelAliases[item.name]||[];
+  for(const alias of [shortName,...historical,...historical.map(name=>name+'貝果')]){
+   const key=statsItemKey(alias);
+   if(key===statsItemKey(item.name))continue;
+   const matches=aliases.get(key)||new Set();
+   matches.add(item.name);
+   aliases.set(key,matches);
+  }
+ }
+ return name=>{
+  const key=statsItemKey(name);
+  if(key==='明太子'||key==='明太子貝果'||key==='芋頭'||key==='芋頭貝果')return null;
+  const item=catalog.get(key),matches=aliases.get(key);
+  if(item&&item.category!=='貝果')return null;
+  if(!officialKeys.has(key)&&matches?.size===1)return matches.values().next().value;
+  return item?.name;
+ };
+}
+const sumQuantity=rows=>rows.reduce((sum,row)=>sum+row.quantity,0);
+function drawBagelStats(dates,rows,total){
+ const byDate=new Map(dates.map(date=>[date,new Map()]));
+ for(const {pickup_date,item,quantity} of rows){
+  const items=byDate.get(pickup_date);
+  items.set(item,(items.get(item)||0)+quantity);
+ }
+ const daily=[...byDate].map(([date,items])=>{
+  const subtotal=[...items.values()].reduce((sum,qty)=>sum+qty,0);
+  const lines=[...items].sort(([a],[b])=>a.localeCompare(b,'zh-TW'))
+   .map(([item,qty])=>'<div class="order row"><span>'+htmlEscape(item)+'</span><b>'+qty+' 顆</b></div>').join('');
+  return '<section class="card"><div class="row"><strong>'+htmlEscape(date)+'</strong><strong>當日小計 '+subtotal+' 顆</strong></div>'+
+   (lines||'<p class="hint">當日沒有貝果訂單</p>')+'</section>';
+ }).join('');
+ $('bagelStats').innerHTML='<div class="card row"><strong>全部日期總計</strong><strong>'+total+' 顆</strong></div>'+
+  (daily||'<p class="hint">目前沒有貝果訂單</p>');
+}
 function draw(){
 const active=orders.filter(x=>x.status==='active'),sel=$('dateFilter'),v=sel.value;const dates=[...new Set(active.map(x=>x.pickup_date))].sort();sel.innerHTML='<option value="all">全部日期</option>'+dates.map(d=>'<option value="'+d+'">'+d+'</option>').join('');sel.value=dates.includes(v)?v:'all';
-const scoped=active.filter(x=>sel.value==='all'||x.pickup_date===sel.value),b=scoped.filter(x=>bagel(x.item)),other=scoped.filter(x=>!bagel(x.item));const n=a=>a.reduce((sum,x)=>sum+x.quantity,0);
-$('cards').innerHTML=[['貝果',n(b)],['其他餐點',n(other)],['訂單筆數',scoped.length],['客人數',new Set(scoped.map(x=>x.customer)).size]].map(x=>'<div class="card"><div class="hint">'+x[0]+'</div><h2>'+x[1]+'</h2></div>').join('');
+const visibleDates=sel.value==='all'?dates:[sel.value];
+const scoped=active.filter(x=>sel.value==='all'||x.pickup_date===sel.value);
+const bagelName=bagelNameLookup(),bagels=[],other=[];
+for(const order of active){
+ const item=bagelName(order.item);
+ if(item)bagels.push({...order,item});
+ else if(sel.value==='all'||order.pickup_date===sel.value)other.push(order);
+}
+const visibleBagels=sel.value==='all'?bagels:bagels.filter(x=>x.pickup_date===sel.value);
+$('cards').innerHTML=[['貝果',sumQuantity(visibleBagels)],['其他餐點',sumQuantity(other)],['訂單筆數',scoped.length],['客人數',new Set(scoped.map(x=>x.customer)).size]].map(x=>'<div class="card"><div class="hint">'+x[0]+'</div><h2>'+x[1]+'</h2></div>').join('');
 const group=a=>{const m=new Map();for(const x of a)m.set(x.item,(m.get(x.item)||0)+x.quantity);return [...m].sort((a,b)=>b[1]-a[1]).map(x=>'<div class="card row"><b>'+htmlEscape(x[0])+'</b><b>'+x[1]+'</b></div>').join('')||'<p class="hint">目前沒有訂單</p>'};
-$('bagelStats').innerHTML=group(b);$('otherStats').innerHTML=group(other);
+drawBagelStats(visibleDates,visibleBagels,sumQuantity(bagels));$('otherStats').innerHTML=group(other);
 const q=$('search').value.trim().toLowerCase();
 $('orderList').innerHTML=orders.filter(x=>[x.customer,x.item,x.notes,x.pickup_date].join(' ').toLowerCase().includes(q)).map(x=>'<div class="order"><div class="row"><b>'+htmlEscape(x.customer)+'</b><span>'+x.pickup_date+'</span></div><div>'+htmlEscape(x.item)+' ×'+x.quantity+'｜'+(x.total_override!=null?'$'+x.total_override+'（手動）':x.price!=null?'$'+(x.price*x.quantity):'未定價')+(x.status==='cancelled'?'（已取消）':'')+'</div><div class="note">'+htmlEscape(x.notes)+'</div><div class="row"><span class="hint">版本 '+x.version+'</span><div><button class="secondary" onclick="editOrder(\''+x.id+'\')">修改</button> <button class="secondary" onclick="cancelOrder(\''+x.id+'\')" '+(x.status==='cancelled'?'disabled':'')+'>取消</button></div></div></div>').join('')||'<p class="hint">沒有訂單</p>';
 const groups=new Map();for(const x of [...active].sort((a,b)=>a.pickup_date.localeCompare(b.pickup_date)||a.customer.localeCompare(b.customer)||rank(a.item)-rank(b.item))){const key=x.pickup_date+'|'+x.customer;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(x)}
@@ -110,4 +192,4 @@ $('orderForm').addEventListener('submit',async e=>{e.preventDefault();if(!client
 async function loadAudit(){if(!client||!session)return;const {data,error}=await client.from('breakfast_order_audit').select('event,actor,occurred_at,after_row').order('occurred_at',{ascending:false}).limit(60);$('auditList').innerHTML=error?htmlEscape(error.message):(data||[]).map(x=>'<div class="order"><b>'+htmlEscape(x.event)+' '+htmlEscape(x.after_row?.customer||'')+'</b><div>'+htmlEscape(x.after_row?.item||'')+'</div><div class="hint">'+new Date(x.occurred_at).toLocaleString('zh-TW')+'｜操作者 '+htmlEscape(x.actor||'未知')+'</div></div>').join('')||'尚無修改紀錄'}
 function downloadCsv(){const lines=[['日期','客人','品項','數量','單價','實際總額','手動總額','備註','狀態','更新者','版本'],...orders.map(o=>[o.pickup_date,o.customer,o.item,o.quantity,o.price??'',o.total_override??(o.price==null?'':o.price*o.quantity),o.total_override??'',o.notes,o.status,o.updated_by,o.version])];const csv='\uFEFF'+lines.map(a=>a.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');const u=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=u;a.download='吃早餐_雲端訂單.csv';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
 boot();
-</script><script src="./menu-google-20261108.js?v=20261108-pricing2"></script><script src="./cloud-extras.js?v=20261109-mentaiko4"></script></body></html>
+</script><script src="./menu-google-20261108.js?v=20261108-pricing2"></script><script src="./cloud-extras.js?v=20261109-bagel-stats"></script></body></html>
