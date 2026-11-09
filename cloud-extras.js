@@ -189,6 +189,6 @@ function updateAmount(){const active=orders.filter(x=>x.status==='active');let s
 extrasMount();
 const originalSetSession=setSession;setSession=async function(s){await originalSetSession(s);if(s){await refreshExtras();if(!extrasChannel&&client){extrasChannel=client.channel('breakfast-extra').on('postgres_changes',{event:'*',schema:'public',table:'breakfast_menu'},()=>refreshExtras()).on('postgres_changes',{event:'*',schema:'public',table:'breakfast_proposals'},()=>refreshExtras()).subscribe()}}else if(extrasChannel&&client){await client.removeChannel(extrasChannel);extrasChannel=null}};
 const originalDraw=draw;draw=function(){originalDraw();updateAmount()};
-const originalEdit=editOrder;editOrder=function(id){originalEdit(id);const o=orders.find(x=>x.id===id);document.getElementById('totalOverride').value=o?.total_override??'';previewAmount()};
-const originalClear=clearForm;clearForm=function(){originalClear();document.getElementById('totalOverride').value='';document.getElementById('menuChooser').value='';previewAmount()};
+const originalEdit=editOrder;editOrder=function(id){if(originalEdit(id)===false)return;const o=orders.find(x=>x.id===id);document.getElementById('totalOverride').value=o?.total_override??'';previewAmount()};
+const originalClear=clearForm;clearForm=function(){originalClear();document.getElementById('totalOverride').value='';document.getElementById('menuChooser').value='';updateOrderPriceType(null);previewAmount()};
 if(session)refreshExtras();
