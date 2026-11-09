@@ -35,7 +35,7 @@ body:not(.login-mode) .counts .card h2{font-size:clamp(26px,6vw,34px);margin:9px
 body:not(.login-mode) .counts .card .hint{font-size:13px;font-weight:800;color:#906344}
 body:not(.login-mode) .order{padding:14px 12px;margin:8px 0;border:1px solid #f2dfc5;background:#fffcf5;border-radius:14px}
 body:not(.login-mode) .order .row>b{color:#793c1e}
-body:not(.login-mode) #bagelStats .card,body:not(.login-mode) #otherStats .card{border-left:5px solid #e7a34e}
+body:not(.login-mode) #mealStats .card{border-left:5px solid #e7a34e}
 body:not(.login-mode) #menuList .card{border-left:5px solid #f3af64}
 body:not(.login-mode) #proposalList .card{border:1px solid #f3d4ab!important;border-left:5px solid #ed9c4b!important}
 body:not(.login-mode) #cloudRevenue{background:linear-gradient(135deg,#fff9e9,#ffeccf);border-color:#f4d7a3}
