@@ -13,7 +13,7 @@ function grouped(rows){
  for(const x of rows){const key=keyOf(x);if(!result.has(key))result.set(key,[]);result.get(key).push(x)}
  return [...result.values()];
 }
-function amount(x){return x.total_override!==null&&x.total_override!==''?Number(x.total_override):x.price===null||x.price===''?null:Number(x.price)*Number(x.quantity)}
+function amount(x){return x.total_override!=null&&x.total_override!==''?Number(x.total_override):x.price==null||x.price===''?null:Number(x.price)*Number(x.quantity)}
 function card(group){
  const live=group.filter(x=>x.status==='active'),x=group[0],total=live.reduce((v,item)=>v+Number(amount(item)??0),0);
  const missing=live.some(y=>amount(y)===null);
@@ -50,7 +50,7 @@ function updateTotals(){
  const known=all.reduce((a,x)=>a+(x??0),0),missing=all.some(x=>x===null);
  el('wholeOrderTotal').textContent='$'+known.toFixed(0)+(missing?'（另有未定價）':'');
  el('wholeOrderCount').textContent=live.length+' 個品項';
- el('wholeOrderSave').disabled=busy||live.length===0;
+ el('wholeOrderSave').disabled=busy;
 }
 function renderLines(){
  el('wholeOrderItems').innerHTML=editing.lines.map(editorLine).join('');
@@ -98,7 +98,7 @@ function addLine(){
 async function saveWholeOrder(){
  if(!editing||busy)return;
  const valid=editing.lines.filter(x=>!x.remove);
- if(!valid.length){el('wholeOrderMessage').textContent='至少保留一個品項；若要取消整單，請在品項管理中確認。';return}
+ if(!valid.length&&!confirm('這會取消原訂單內全部有效品項。確定要繼續嗎？'))return;
  for(let i=0;i<editing.lines.length;i++){
   const x=editing.lines[i];
   if(x.remove)continue;
