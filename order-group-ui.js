@@ -71,6 +71,9 @@ editOrder=function(id){
  const result=originalEdit(id);
  const x=orders.find(row=>row.id===id);
  if(x){
+  // Editing a line must not silently move it into a separate customer/date order.
+  document.getElementById('customer').readOnly=true;
+  document.getElementById('pickup').readOnly=true;
   document.getElementById('orderGroupInfo').textContent='正在修改 '+x.customer+' 於 '+x.pickup_date+' 的原訂單品項，會保留原品項版本紀錄。';
   document.getElementById('orderGroupInfo').classList.remove('hidden');
  }
