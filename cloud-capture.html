@@ -9,7 +9,7 @@
 <div class="card"><h2>② 核對原始文字</h2><p class="hint">更推薦直接匯入 LINE 匯出的聊天紀錄 TXT，可保留原本的發言人與時間；若只有照片，仍可用上方 OCR。</p><label>LINE 聊天紀錄 TXT（可選）<input type="file" id="chatTxt" accept=".txt,text/plain"></label><div class="cols"><label>訊息起始日期<input id="txtFrom" type="date"></label><label>訊息起始時間<input id="txtFromTime" type="time" value="00:00" step="60"></label><label>訊息結束日期<input id="txtTo" type="date"></label><label>訊息結束時間<input id="txtToTime" type="time" value="23:59" step="60"></label></div><p class="hint">依 LINE 訊息「發送日期＋時間」篩選，非取餐日期。起迄時間都包含在內，適合分批補讀新訂單；重複訊息送審時仍會嘗試排除。</p><button class="alt" onclick="importChatTxt()">讀取 TXT 原始訊息</button><p class="hint">可貼上 LINE 匯出的文字，也可直接改正 OCR 內容。識別結果還不是正式訂單。</p><textarea rows="9" id="rawText" placeholder="可先選擇截圖辨識，或貼上 LINE 原始對話"></textarea><label>預設取餐日期（無法辨識時用）<input type="date" id="defaultDate"></label><button onclick="extractCandidates()">從文字產生候選單</button> <button class="alt" onclick="addCandidate()">手動新增一筆候選</button></div>
 <div class="card"><h2>③ 依客人＋取餐日整單確認</h2><p class="hint">客人可使用簡稱（例如「阿華田」），系統會對照正式菜單；「芋頭」可能指貝果或甜點，需先選正確品項。✅ <strong>品項小計＝數量 × 單價，系統自動計算</strong>，只有特殊折扣或組合優惠才需展開「特別總額」手動修改。</p><div id="candidateValidation" class="card hidden" role="status" aria-live="polite"></div><div id="candidates"></div><button class="alt" type="button" onclick="showCandidateIssues(false)">🔎 檢查候選單缺漏</button> <button id="send" onclick="sendToCloud()">送出勾選的候選單至共同審核</button><p id="sendMsg" class="status"></p></div>
 </div></main>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script><script src="./cloud-config.js"></script><script src="./line-parser-v2.js?v=20261109-awatara3"></script><script src="./line-txt-v3.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script><script src="./cloud-config.js"></script><script src="./line-parser-v2.js?v=20261109-mentaiko4"></script><script src="./line-txt-v3.js"></script>
 <script>
 let api=null,user=null,menu=[],existing=[],proposals=[],selectedFiles=[],fileHashes=[],fileTexts=[],currentSource='image';
 const $=id=>document.getElementById(id);
@@ -42,6 +42,8 @@ function catalogCandidates(v){
  const active=menu.filter(m=>m.active!==false);
  // General shorthand "芋頭" may refer to a bagel or dessert; require human choice.
  if(key==='芋頭')return active.filter(m=>/大甲香芋|芋頭|芋見/.test(m.name));
+ // "明太子貝果" is ambiguous between regular and volcano versions, never assume.
+ if(key==='明太子貝果'||key==='明太子')return active.filter(m=>m.category==='貝果'&&m.name.includes('明太子'));
  const byKeys=fn=>active.filter(fn);
  let hits=byKeys(m=>itemKey(m.name)===key);
  if(hits.length)return hits;
@@ -74,7 +76,7 @@ function normalizeCandidateItem(p){
   p.price='';p.flag=true;p.reason=p.catalogHint;
  }
 }
-function recognitionNames(){return [...new Set([...menu.map(m=>m.name),...Object.values(itemAliases).flat(),'芋頭'])]}
+function recognitionNames(){return [...new Set([...menu.map(m=>m.name),...Object.values(itemAliases).flat(),'芋頭','明太子貝果','明太子'])]}
 function localDate(v){const m=String(v).match(/(?:(20\d{2})[\/.-])?(\d{1,2})[\/.-](\d{1,2})/);if(!m)return null;const y=m[1]||new Date().getFullYear();const d=y+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0');return Number(m[2])<=12&&Number(m[3])<=31?d:null}
 async function init(){const cfg=window.BREAKFAST_CLOUD||{};
 if(!window.supabase?.createClient||!cfg.url||!cfg.publishableKey){$('access').textContent='雲端設定尚未完成';return}
