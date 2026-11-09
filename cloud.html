@@ -24,6 +24,7 @@ body.login-mode>.wrap{max-width:530px;padding:clamp(12px,3vw,24px);margin:0 auto
 .login-v2 .login-help a{color:#8f5027;font-weight:750}
 .login-v2 .privacy-note{text-align:center;color:#825f49;background:#fff2db;padding:10px 12px;border-radius:14px;font-size:12px;margin:14px 0 0}
 .login-v2 .status{color:#b04c25;text-align:center;font-size:14px;min-height:14px}
+.print-card .customer-message{white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:370px){#loginCard.login-v2{padding:16px 15px}.login-duo{width:min(100%,240px)}.login-brand .wordmark{font-size:38px}}
 @media(prefers-reduced-motion:no-preference){.login-duo{animation:loginUp .45s ease-out both}@keyframes loginUp{from{transform:translateY(9px);opacity:.4}to{transform:translateY(0);opacity:1}}}
 </style><link rel="stylesheet" href="./cloud-theme.css?v=20261108-joy1"></head><body class="login-mode">
@@ -192,7 +193,20 @@ $('orderList').innerHTML=orders.filter(x=>[x.customer,x.item,x.notes,x.pickup_da
 const groups=new Map();for(const x of [...active].sort((a,b)=>a.pickup_date.localeCompare(b.pickup_date)||a.customer.localeCompare(b.customer)||rank(a.item)-rank(b.item))){const key=x.pickup_date+'|'+x.customer;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(x)}
 $('printOrderCards').disabled=!groups.size;
 $('printEmpty').classList.toggle('hidden',groups.size>0);
-$('printCards').innerHTML=[...groups].map(([key,a])=>'<div class="print-card"><div>'+htmlEscape(key.replace('|','　'))+'</div>'+a.map(x=>'<div class="detail">'+htmlEscape(x.item)+' ×'+x.quantity+(x.total_override!=null?' $'+x.total_override:x.price==null?'':' $'+(x.price*x.quantity))+(x.notes?'<div>※ '+htmlEscape(x.notes)+'</div>':'')+'</div>').join('')+'<div style="border-top:1px solid #999;margin-top:4px">合計 $'+a.reduce((s,x)=>s+Number(x.total_override??(x.price==null?0:x.price*x.quantity)),0).toFixed(0)+(a.some(x=>x.total_override==null&&x.price==null)?'（另有未定價）':'')+'</div></div>').join('')}
+$('printCards').innerHTML=[...groups].map(([key,items])=>renderPrintCard(key,items)).join('')}
+function renderPrintCard(key,items){
+ const amount=order=>order.total_override??(order.price==null?null:order.price*order.quantity);
+ const details=items.map(order=>{
+  const subtotal=amount(order);
+  return '<div class="detail">'+htmlEscape(order.item)+' ×'+order.quantity+(subtotal==null?'':' $'+subtotal)+'</div>';
+ }).join('');
+ const total=items.reduce((sum,order)=>sum+Number(amount(order)??0),0);
+ const unpriced=items.some(order=>amount(order)==null)?'（另有未定價）':'';
+ const messages=new Set(items.map(order=>String(order.notes??'').replace(/\r\n?/g,'\n').trim()).filter(Boolean));
+ const note=[...messages].map(message=>'<div class="customer-message">* '+htmlEscape(message)+'</div>').join('');
+ return '<div class="print-card"><div>'+htmlEscape(key.replace('|','　'))+'</div>'+details+
+  '<div style="border-top:1px solid #999;margin-top:4px">合計 $'+total.toFixed(0)+unpriced+'</div>'+note+'</div>';
+}
 function clearForm(){$('orderForm').reset();$('editId').value='';$('editVersion').value='';$('formTitle').textContent='新增訂單'}
 function editOrder(id){const x=orders.find(o=>o.id===id);if(!x)return;tab('manage');$('editId').value=x.id;$('editVersion').value=x.version;$('customer').value=x.customer;$('pickup').value=x.pickup_date;$('item').value=x.item;$('qty').value=x.quantity;$('price').value=x.price??'';$('notes').value=x.notes;$('formTitle').textContent='修改訂單（版本 '+x.version+'）';window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'})}
 async function cancelOrder(id){const x=orders.find(o=>o.id===id);if(!x||!confirm('確認取消 '+x.customer+' 的 '+x.item+'？原始紀錄會保留。'))return;const {data,error}=await client.from('breakfast_orders').update({status:'cancelled'}).eq('id',x.id).eq('version',x.version).select('id');if(error||!data?.length)alert('取消失敗或別人已修改。請同步後重新確認。');await reload()}
