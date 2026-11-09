@@ -47,7 +47,7 @@ body.login-mode>.wrap{max-width:530px;padding:clamp(12px,3vw,24px);margin:0 auto
 <div class="card row"><b id="syncStatus">正在連接雲端…</b><div><button class="secondary" onclick="reload()">同步資料</button> <button class="secondary" onclick="signOut()">登出</button></div></div>
 <div id="dashboard" class="screen"><h2>📊 製作統計</h2><p class="hint">依有效正式訂單的取餐日期、品項與數量統計。</p><label>取餐日期<select id="dateFilter" onchange="draw()"></select></label><div class="counts" id="cards"></div><h3>每日品項統計</h3><div id="mealStats" aria-live="polite"></div></div>
 <div id="manage" class="screen hidden"><h2>📝 共同訂單</h2><input id="search" placeholder="搜尋客人或品項" oninput="draw()"><div id="orderList"></div><div class="card"><div class="row"><h3 id="formTitle">新增訂單</h3><button type="button" id="addOrderItem" class="secondary hidden" onclick="addItemToOrder()">＋ 加入這張訂單</button></div><p id="orderGroupInfo" class="hint hidden"></p><form id="orderForm"><input id="editId" type="hidden"><input id="editVersion" type="hidden"><label>客人名稱<input id="customer" required maxlength="100"></label><label>取餐日期<input id="pickup" type="date" required></label><label>品項<input id="item" required maxlength="200"></label><div class="grid"><label>數量<input id="qty" type="number" min="1" max="999" value="1" required></label><label>單價（可空白）<input id="price" type="number" min="0" step=".01"></label></div><label>客製備註<textarea id="notes" rows="3"></textarea></label><button type="submit" id="saveOrder">確認儲存至雲端</button> <button type="button" class="secondary" onclick="clearForm()">清除</button></form></div></div>
-<div id="printview" class="screen hidden"><h2>🖨️ 訂單卡</h2><div class="no-print"><button id="printOrderCards" onclick="window.print()" disabled>A4 列印／儲存 PDF</button><p class="hint">6 公分寬、10pt 粗體，一位客人每天一張。</p><p id="printEmpty" class="hint">目前沒有可列印的有效訂單。</p></div><div id="printCards"></div></div>
+<div id="printview" class="screen hidden"><h2>🖨️ 訂單卡</h2><div class="no-print"><label>選擇取餐日期<select id="printDateFilter" onchange="drawPrintCards()"><option value="all">全部日期</option></select></label><p id="printDateSummary" class="hint" aria-live="polite">請選擇要列印的取餐日期。</p><button id="printOrderCards" onclick="printSelectedOrderCards()" disabled>A4 列印／儲存 PDF</button><p class="hint">只列印所選日期的有效訂單；6 公分寬、10pt 粗體，一位客人每天一張。</p><p id="printEmpty" class="hint">目前沒有可列印的有效訂單。</p></div><div id="printCards"></div></div>
 <div id="history" class="screen hidden"><h2>🕘 操作紀錄與備份</h2><button onclick="loadAudit()">載入最新異動</button> <button class="secondary" onclick="downloadCsv()">匯出目前訂單 CSV</button><div id="auditList" class="card"></div><p class="hint">所有更新都由伺服器留下操作者與時間。取消訂單採保留紀錄方式，不會直接刪除。</p></div>
 </div></div>
 <div class="nav hidden" id="nav"><button onclick="tab('dashboard')">統計</button><button onclick="tab('manage')">訂單</button><button onclick="tab('printview')">訂單卡</button><button onclick="tab('history')">紀錄</button></div>
@@ -203,10 +203,30 @@ $('cards').innerHTML=[['貝果',visibleQuantity(bagels)],['其他餐點',visible
 drawMealStats(visibleDates,[{label:'貝果',unit:'顆',orders:bagels},{label:'其他餐點',unit:'份',orders:other}]);
 const q=$('search').value.trim().toLowerCase();
 $('orderList').innerHTML=orders.filter(x=>[x.customer,x.item,x.notes,x.pickup_date].join(' ').toLowerCase().includes(q)).map(x=>'<div class="order"><div class="row"><b>'+htmlEscape(x.customer)+'</b><span>'+x.pickup_date+'</span></div><div>'+htmlEscape(x.item)+' ×'+x.quantity+'｜'+(x.total_override!=null?'$'+x.total_override+'（手動）':x.price!=null?'$'+(x.price*x.quantity):'未定價')+(x.status==='cancelled'?'（已取消）':'')+'</div><div class="note">'+htmlEscape(x.notes)+'</div><div class="row"><span class="hint">版本 '+x.version+'</span><div><button class="secondary" onclick="editOrder(\''+x.id+'\')">修改</button> <button class="secondary" onclick="cancelOrder(\''+x.id+'\')" '+(x.status==='cancelled'?'disabled':'')+'>取消</button></div></div></div>').join('')||'<p class="hint">沒有訂單</p>';
-const groups=new Map();for(const x of [...active].sort((a,b)=>a.pickup_date.localeCompare(b.pickup_date)||a.customer.localeCompare(b.customer)||rank(a.item)-rank(b.item))){const key=x.pickup_date+'|'+x.customer;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(x)}
-$('printOrderCards').disabled=!groups.size;
-$('printEmpty').classList.toggle('hidden',groups.size>0);
-$('printCards').innerHTML=[...groups].map(([key,items])=>renderPrintCard(key,items)).join('')}
+drawPrintCards(active);
+}
+function drawPrintCards(activeOrders){
+ const active=activeOrders||orders.filter(x=>x.status==='active');
+ const select=$('printDateFilter'),previous=select.value;
+ const dates=[...new Set(active.map(x=>x.pickup_date))].sort();
+ select.innerHTML='<option value="all">全部日期</option>'+dates.map(d=>'<option value="'+htmlEscape(d)+'">'+htmlEscape(d)+'</option>').join('');
+ select.value=dates.includes(previous)?previous:'all';
+ const scoped=active.filter(x=>select.value==='all'||x.pickup_date===select.value);
+ const groups=new Map();
+ for(const x of [...scoped].sort((a,b)=>a.pickup_date.localeCompare(b.pickup_date)||a.customer.localeCompare(b.customer)||rank(a.item)-rank(b.item))){
+  const key=x.pickup_date+'|'+x.customer;
+  if(!groups.has(key))groups.set(key,[]);
+  groups.get(key).push(x);
+ }
+ $('printOrderCards').disabled=!groups.size;
+ $('printEmpty').classList.toggle('hidden',groups.size>0);
+ $('printDateSummary').textContent=(select.value==='all'?'全部日期':'取餐日 '+select.value)+'｜'+groups.size+' 張訂單卡、'+scoped.reduce((n,x)=>n+x.quantity,0)+' 件餐點。';
+ $('printCards').innerHTML=[...groups].map(([key,items])=>renderPrintCard(key,items)).join('');
+}
+function printSelectedOrderCards(){
+ if($('printOrderCards').disabled||!$('printCards').querySelector('.print-card'))return;
+ window.print();
+}
 function renderPrintCard(key,items){
  const amount=order=>order.total_override??(order.price==null?null:order.price*order.quantity);
  const details=items.map(order=>{
