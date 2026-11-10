@@ -35,23 +35,23 @@ function ensureControls(){
  if(!wrapper||elem('printMode'))return;
  const dateInput=elem('printDateFilter');
  dateInput.insertAdjacentHTML('afterend',[
- '<label class="print-mode-selector">列印範圍<select id="printMode">',
- '<option value="pending">只印新增／異動訂單（建議）</option>',
- '<option value="all">重新列印所選日期全部訂單</option>',
+ '<label class="print-mode-selector">PDF 匯出範圍<select id="printMode">',
+ '<option value="pending">只匯出新增／異動訂單（建議）</option>',
+ '<option value="all">重新匯出所選日期全部訂單</option>',
  '</select></label>',
- '<p id="printTrackingStatus" class="hint" aria-live="polite">正在載入共用列印紀錄…</p>',
+ '<p id="printTrackingStatus" class="hint" aria-live="polite">正在載入共用 PDF 匯出紀錄…</p>',
  '<details id="printPrintedBaseline" class="card print-baseline-panel">',
- '<summary>📌 設定以前已印過的訂單（不重新列印）</summary>',
- '<p class="hint">第一次使用必須先補登已經印出的訂單。只勾選確實印過的客人訂單；尚未印過的不要勾。完成後，「只印新增／異動」才會正確排除舊單。</p>',
- '<div class="row print-baseline-actions"><button type="button" class="secondary" id="printBaselineSelectAll">全選未記錄訂單</button><button type="button" class="secondary" id="printBaselineClear">全部取消勾選</button></div>',
+ '<summary>📌 設定以前已匯出的訂單（不重新匯出）</summary>',
+ '<p class="hint">第一次使用請先補登之前已存成 PDF 的訂單。只勾選確實已匯出的客人訂單；尚未匯出的不要勾。完成後，「只匯出新增／異動」才能正確排除舊單。</p>',
+ '<div class="row print-baseline-actions"><button type="button" class="secondary" id="printBaselineSelectAll">全選未記錄的訂單</button><button type="button" class="secondary" id="printBaselineClear">全部取消勾選</button></div>',
  '<div id="printBaselineList"></div>',
- '<button type="button" id="printBaselineSave">✅ 把勾選的訂單設為已印（不列印）</button>',
+ '<button type="button" id="printBaselineSave">✅ 將勾選訂單標記為已匯出（不產生 PDF）</button>',
  '</details>',
  '<div id="printAfterActions" class="card hidden">',
- '<b>🖨️ 列印視窗已開啟</b>',
- '<p class="hint">請確認紙張或 PDF 已成功輸出，再按「確認已列印」。若取消列印，請選「這次沒有印出」，訂單仍會保留在待印清單。</p>',
- '<button type="button" id="printConfirmBatch">✅ 確認已列印，記錄這批訂單</button>',
- '<button type="button" class="secondary" id="printDiscardBatch">這次沒有印出</button>',
+ '<b>📄 已開啟 PDF 儲存視窗</b>',
+ '<p class="hint">請在瀏覽器視窗將目的地選為「另存為 PDF」，確實儲存檔案後再按下方確認。若取消，請選「沒有儲存 PDF」，訂單仍會保留在待匯出清單。</p>',
+ '<button type="button" id="printConfirmBatch">✅ 已成功儲存 PDF，記錄本次匯出</button>',
+ '<button type="button" class="secondary" id="printDiscardBatch">沒有儲存 PDF</button>',
  '</div>'
  ].join(''));
  elem('printMode').addEventListener('change',()=>{cancelBatch(false);drawPrintCards()});
@@ -62,14 +62,14 @@ function ensureControls(){
  elem('printConfirmBatch').addEventListener('click',confirmBatch);
  elem('printDiscardBatch').addEventListener('click',()=>cancelBatch(true));
  const btn=elem('printOrderCards');
- btn.textContent='🖨️ 列印所選訂單卡';
+ btn.textContent='📄 匯出所選訂單卡 PDF';
 }
 function cancelBatch(notify){
  if(printBusy)return;
  printBatch=null;elem('printAfterActions')?.classList.add('hidden');
  if(elem('printDateFilter'))elem('printDateFilter').disabled=false;
  if(elem('printMode'))elem('printMode').disabled=false;
- if(notify)elem('printTrackingStatus').textContent='本次未列印，所有訂單仍保留在待印清單。';
+ if(notify)elem('printTrackingStatus').textContent='本次未儲存 PDF，所有訂單仍保留在待匯出清單。';
  drawPrintCards();
 }
 async function fetchPrintLog(date,force=false){
@@ -79,7 +79,7 @@ async function fetchPrintLog(date,force=false){
  const run=++loadSerial,loggedSession=session;
  loadingFor=date;
  const status=elem('printTrackingStatus');
- if(status)status.textContent='正在同步兩位管理者的列印紀錄…';
+ if(status)status.textContent='正在同步兩位管理者的 PDF 匯出紀錄…';
  try{
   let rows=[];
   if(date==='all'){
@@ -100,11 +100,11 @@ async function fetchPrintLog(date,force=false){
   printedByKey.clear();
   for(const row of rows)printedByKey.set(keyFor(row.pickup_date,row.customer),row.print_signature);
   printLogLoadedFor=date;
-  if(status)status.textContent='✅ 列印紀錄已同步。只有確認印出的訂單才會排除補印。';
+  if(status)status.textContent='✅ PDF 匯出紀錄已同步。只有確認已儲存 PDF 的訂單才會排除重複匯出。';
  }catch(e){
   if(run===loadSerial){
    printLogLoadedFor='';
-   if(status)status.textContent='⚠️ 列印紀錄同步失敗：'+e.message+'，為避免重印，請先重新整理。';
+   if(status)status.textContent='⚠️ PDF 匯出紀錄同步失敗：'+e.message+'，為避免重複匯出，請先重新整理。';
   }
  }finally{
   if(run===loadSerial){
@@ -117,7 +117,7 @@ async function fetchPrintLog(date,force=false){
 function renderBaseline(date,allGroups,ready){
  const list=elem('printBaselineList'),panel=elem('printPrintedBaseline');
  if(!list||!panel)return;
- if(!ready){list.innerHTML='<p class="hint">正在確認雲端列印紀錄…</p>';elem('printBaselineSave').disabled=true;return}
+ if(!ready){list.innerHTML='<p class="hint">正在確認雲端 PDF 匯出紀錄…</p>';elem('printBaselineSave').disabled=true;return}
  if(date==='all'){
   list.innerHTML='<p class="hint">請先選擇一個取餐日期，再勾選該日期已經印過的訂單。</p>';
   elem('printBaselineSave').disabled=true;return;
@@ -127,7 +127,7 @@ function renderBaseline(date,allGroups,ready){
  list.innerHTML=missing.map((group,index)=>{
   const quantity=group.lines.reduce((sum,row)=>sum+Number(row.quantity),0);
   return '<label class="print-baseline-row"><input type="checkbox" value="'+index+'"><span><strong>'+escapeText(group.customer)+'</strong>｜'+group.lines.length+' 種品項，'+quantity+' 件</span></label>';
- }).join('')||'<p class="hint">所選日期全部客人訂單都已有列印紀錄；若後續改單，仍會自動列入補印。</p>';
+ }).join('')||'<p class="hint">所選日期全部客人訂單都有 PDF 匯出紀錄；若後續改單，仍會自動列入待匯出。</p>';
  panel.dataset.baselineDate=date;
 }
 async function saveBaseline(){
@@ -138,8 +138,8 @@ async function saveBaseline(){
  const groups=groupedActive(date).filter(g=>!printedByKey.has(keyFor(g.date,g.customer)));
  const checked=[...elem('printBaselineList').querySelectorAll('input[type="checkbox"]:checked')]
   .map(x=>groups[Number(x.value)]).filter(Boolean);
- if(!checked.length){alert('請先勾選已經實際列印過的客人訂單');return}
- if(!confirm('確定以下 '+checked.length+' 張訂單卡「以前就已印過」？\n這次不會列印任何紙張；勾選的訂單將從待印名單移除，未勾選仍可補印。'))return;
+ if(!checked.length){alert('請先勾選之前已確實存成 PDF 的客人訂單');return}
+ if(!confirm('確定以下 '+checked.length+' 張訂單卡「以前已存成 PDF」？\n這次不會產生 PDF；勾選的訂單將從待匯出清單移除，未勾選仍可匯出。'))return;
  printBusy=true;
  elem('printBaselineSave').disabled=true;
  const batch=checked.map(g=>({pickup_date:g.date,customer:g.customer,print_signature:signature(g.lines)}));
@@ -149,9 +149,9 @@ async function saveBaseline(){
   printLogLoadedFor='';
   await fetchPrintLog(date,true);
   if(elem('printPrintedBaseline'))elem('printPrintedBaseline').open=false;
-  if(elem('printTrackingStatus'))elem('printTrackingStatus').textContent='✅ 已補登 '+batch.length+' 張過去已印訂單，未勾選的訂單保留待印。';
+  if(elem('printTrackingStatus'))elem('printTrackingStatus').textContent='✅ 已補登 '+batch.length+' 張過去已匯出訂單，未勾選的訂單保留待匯出。';
  }catch(e){
-  elem('printTrackingStatus').textContent='⚠️ 補登列印紀錄失敗：'+e.message+'，請確認後再操作。';
+  elem('printTrackingStatus').textContent='⚠️ 補登 PDF 匯出紀錄失敗：'+e.message+'，請確認後再操作。';
  }finally{printBusy=false;drawPrintCards()}
 }
 drawPrintCards=function(activeOrders){
@@ -182,19 +182,19 @@ drawPrintCards=function(activeOrders){
  const pending=grouped.filter(group=>printedByKey.get(keyFor(group.date,group.customer))!==signature(group.lines));
  const selected=mode==='all'?grouped:(ready?pending:[]);
  renderBaseline(date,grouped,ready);
- const extra=mode==='pending'?'｜待印 '+(ready?pending.length:'讀取中')+' 張｜已記錄 '+(ready?grouped.length-pending.length:'讀取中')+' 張':'｜本次全部 '+grouped.length+' 張';
+ const extra=mode==='pending'?'｜待匯出 '+(ready?pending.length:'讀取中')+' 張｜已記錄 '+(ready?grouped.length-pending.length:'讀取中')+' 張':'｜本次全部 '+grouped.length+' 張';
  elem('printOrderCards').disabled=printBusy||!selected.length||!ready||!!printBatch;
  elem('printEmpty').classList.toggle('hidden',selected.length>0);
  elem('printDateSummary').textContent=(date==='all'?'全部日期':'取餐日 '+date)+'｜有效 '+grouped.length+' 張訂單卡'+extra;
  elem('printCards').innerHTML=selected.map(group=>{
   const changed=printedByKey.has(keyFor(group.date,group.customer));
-  const badge=mode==='pending'?'<div class="print-pending-badge">'+(changed?'【已異動，重新補印】':'【新增訂單卡】')+'</div>':'';
+  const badge=mode==='pending'?'<div class="print-pending-badge">'+(changed?'【已異動，重新匯出】':'【新增待匯出訂單卡】')+'</div>':'';
   return renderPrintCard(group.date+'|'+group.customer,group.lines).replace('<div class="print-card">','<div class="print-card">'+badge);
  }).join('');
  if(ready&&!printBatch){
   elem('printTrackingStatus').textContent=mode==='pending'?
-   (pending.length?'本次待印 '+pending.length+' 張。若以前已印過、但系統沒有紀錄，請先展開「設定以前已印過的訂單」勾選補登，避免重印。':'✅ 目前所選日期沒有待補印的新訂單或異動訂單。'):
-   '目前選擇重新列印全部訂單，列印後仍需確認以更新列印紀錄。';
+   (pending.length?'本次待匯出 '+pending.length+' 張。若以前已存成 PDF、但系統沒有紀錄，請先展開「設定以前已匯出的訂單」補登，避免重複匯出。':'✅ 目前所選日期沒有待匯出的新訂單或異動訂單。'):
+   '目前選擇重新匯出全部訂單，儲存 PDF 後請確認，以更新匯出紀錄。';
  }
 };
 printSelectedOrderCards=function(){
@@ -209,11 +209,11 @@ printSelectedOrderCards=function(){
  elem('printMode').disabled=true;
  elem('printAfterActions').classList.remove('hidden');
  elem('printOrderCards').disabled=true;
- try{window.print()}catch(e){cancelBatch(true);alert('列印視窗未開啟：'+e.message)}
+ try{window.print()}catch(e){cancelBatch(true);alert('PDF 儲存視窗未開啟：'+e.message)}
 };
 async function confirmBatch(){
  if(!printBatch?.length||printBusy||!client||!session)return;
- if(!confirm('請確認這 '+printBatch.length+' 張訂單卡已成功列印或存成 PDF，確定標記為「已印」？'))return;
+ if(!confirm('請確認這 '+printBatch.length+' 張訂單卡已成功儲存為 PDF，確定標記為「已匯出」？'))return;
  printBusy=true;elem('printConfirmBatch').disabled=true;
  const batch=printBatch.map(x=>({...x}));
  try{
@@ -223,8 +223,8 @@ async function confirmBatch(){
   elem('printDateFilter').disabled=false;elem('printMode').disabled=false;
   const date=elem('printDateFilter').value;
   printLogLoadedFor='';await fetchPrintLog(date,true);
-  elem('printTrackingStatus').textContent='✅ 已記錄 '+batch.length+' 張列印結果，兩位管理者同步；新訂單或後續異動會再顯示。';
- }catch(e){elem('printTrackingStatus').textContent='⚠️ 無法儲存列印紀錄：'+e.message+'，請勿重複列印，先重試確認。'}
+  elem('printTrackingStatus').textContent='✅ 已記錄 '+batch.length+' 張 PDF 匯出結果，兩位管理者同步；新訂單或後續異動會再顯示。';
+ }catch(e){elem('printTrackingStatus').textContent='⚠️ 無法儲存列印紀錄：'+e.message+'，請勿重複匯出，先重試確認。'}
  finally{printBusy=false;elem('printConfirmBatch').disabled=false;drawPrintCards()}
 }
 const previousTab=tab;
