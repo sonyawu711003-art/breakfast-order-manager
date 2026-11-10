@@ -14,35 +14,65 @@ function endOfWeek(){return plusDays(week,6)}
 function bagelName(item){
  try{return bagelNameLookup()(item)||null}catch(e){return null}
 }
+function menuBagels(){
+ const rows=(typeof menuRows!=='undefined'&&menuRows.length?menuRows:(window.BREAKFAST_GOOGLE_MENU_20261108||[]));
+ return [...new Set(rows.filter(x=>x.category==='貝果'&&x.active!==false).map(x=>String(x.name).trim()).filter(Boolean))];
+}
+function canonicalBagel(name,names){
+ if(names.includes(name))return name;
+ const aliases={
+  '玫瑰蔓越莓紅寶石':'蔓越莓玫瑰紅寶石',
+  '蔓越莓紅寶石':'蔓越莓玫瑰紅寶石',
+  '蔓越莓紅寶石貝果':'蔓越莓玫瑰紅寶石',
+  '流沙乳酪碳金貝果':'碳金流沙乳酪貝果',
+  '碳金流沙乳酪碳金貝果':'碳金流沙乳酪貝果',
+  '大甲芋頭貝果':'大甲香芋貝果',
+  '原味明太子貝果':'原味炙燒北海道明太子貝果'
+ };
+ const alias=aliases[name];
+ if(alias&&names.includes(alias))return alias;
+ const recognized=bagelName(name);
+ if(recognized&&names.includes(recognized))return recognized;
+ return null;
+}
 function model(){
- const names=new Set();
- const menu=[...(window.BREAKFAST_GOOGLE_MENU_20261108||[]),...(typeof menuRows==='undefined'?[]:menuRows)];
- for(const m of menu)if(m.category==='貝果')names.add(m.name);
- for(const x of stock)names.add(x.item_name);
- for(const x of ledger)names.add(x.item_name);
- const booked=new Map(),unknown=[];
+ const names=menuBagels(),booked=new Map(),unknown=[];
  for(const x of orders){
   if(x.status!=='active'||x.pickup_date<week||x.pickup_date>endOfWeek())continue;
-  const name=bagelName(x.item);
-  if(name){names.add(name);booked.set(name,(booked.get(name)||0)+Number(x.quantity))}
+  const name=canonicalBagel(x.item,names);
+  if(name)booked.set(name,(booked.get(name)||0)+Number(x.quantity));
   else if(/貝果|明太子|芋頭|阿華田|紅寶石|流沙/.test(x.item)&&!/吐司|三明治|漢堡|沙拉/.test(x.item))unknown.push(x.item);
  }
- const open=new Map(stock.map(x=>[x.item_name,Number(x.opening_qty)]));
- const movement=new Map();
- for(const x of ledger){
-  const m=movement.get(x.item_name)||{retail:0,restock:0,correction:0};
-  if(x.event_type==='retail_sale')m.retail+=Number(x.quantity);
-  else if(x.event_type==='restock')m.restock+=Number(x.quantity);
-  else m.correction+=Number(x.quantity);
-  movement.set(x.item_name,m);
+ const stockGroups=new Map(),movement=new Map(),legacy=[];
+ for(const row of stock){
+  const name=canonicalBagel(row.item_name,names);
+  if(!name){legacy.push('期初：'+row.item_name+' '+row.opening_qty+' 顆');continue}
+  if(!stockGroups.has(name))stockGroups.set(name,[]);
+  stockGroups.get(name).push(row);
  }
- catalog=[...names].sort((a,b)=>a.localeCompare(b,'zh-TW'));
- return {rows:catalog.map(name=>{
+ for(const entry of ledger){
+  const name=canonicalBagel(entry.item_name,names);
+  if(!name){legacy.push('異動：'+entry.item_name+' '+entry.quantity+' 顆');continue}
   const m=movement.get(name)||{retail:0,restock:0,correction:0};
-  const opening=open.has(name)?open.get(name):null,reserved=booked.get(name)||0;
+  if(entry.event_type==='retail_sale')m.retail+=Number(entry.quantity);
+  else if(entry.event_type==='restock')m.restock+=Number(entry.quantity);
+  else if(entry.event_type==='sale_correction')m.correction+=Number(entry.quantity);
+  movement.set(name,m);
+ }
+ const ambiguous=[];
+ catalog=names;
+ const rows=names.map(name=>{
+  const sources=stockGroups.get(name)||[];
+  // Never sum two distinct opening inventory records, even when their aliases match.
+  // Leave duplicate stock unresolved for manager review to avoid inventing inventory.
+  if(sources.length>1)ambiguous.push(name+'：'+sources.map(x=>x.item_name+' '+x.opening_qty+' 顆').join('／'));
+  const source=sources.length===1?sources[0]:null;
+  const m=movement.get(name)||{retail:0,restock:0,correction:0};
+  const opening=source?Number(source.opening_qty):null,reserved=booked.get(name)||0;
   const remaining=opening===null?null:opening+m.restock+m.correction-reserved-m.retail;
-  return {name,opening,reserved,...m,remaining,low:remaining!==null&&remaining<3};
- }),unknown:[...new Set(unknown)]};
+  return {name,opening,reserved,...m,remaining,low:remaining!==null&&remaining<3,ambiguous:sources.length>1};
+ });
+ return {rows,unknown:[...new Set(unknown)],legacy,ambiguous};
 }
 function mount(){
  const main=$i('main'),nav=$i('nav');if(!main||!nav||$i('bagelInventory'))return;
@@ -86,21 +116,30 @@ function mount(){
 }
 function show(){
  if(!$i('bagelInventory')||!week)return;
- const {rows,unknown}=model(),low=rows.filter(x=>x.low);
+ const {rows,unknown,legacy,ambiguous}=model(),low=rows.filter(x=>x.low);
  $i('biRange').textContent=week+' ～ '+endOfWeek();
  const date=$i('biDate'),today=tpeToday();
  date.min=week;date.max=endOfWeek();
  if(!date.value||date.value<week||date.value>endOfWeek())date.value=today>=week&&today<=endOfWeek()?today:week;
  $i('biOpenRows').innerHTML=rows.map(x=>'<label class="bi-open-row"><span>'+esc(x.name)+'</span><input type="number" inputmode="numeric" min="0" max="99999" data-bi-name="'+esc(x.name)+'" placeholder="未設定" value="'+(x.opening??'')+'"></label>').join('');
  $i('biBalances').innerHTML=rows.map(x=>'<tr'+(x.low?' class="bi-low"':'')+'><td>'+esc(x.name)+'</td><td>'+(x.opening??'—')+'</td><td>'+x.reserved+'</td><td>'+x.retail+'</td><td>'+(x.restock+x.correction)+'</td><td class="'+(x.low?'bi-low-number':'')+'">'+(x.remaining===null?'未設定':x.remaining+' 顆')+(x.low?' ⚠️':'')+'</td></tr>').join('');
- $i('biWarning').innerHTML=low.length?'<div class="bi-alert">⚠️ 庫存低於 3 顆：'+low.map(x=>esc(x.name)+' '+x.remaining+' 顆').join('、')+'</div>':'<p class="hint">已設定期初的口味，目前沒有低於 3 顆的品項。</p>';
- $i('biUnknown').textContent=(rows.filter(x=>x.opening===null).length+' 個品項尚未設定期初數量。')+(unknown.length?' ⚠️ 有無法對應菜單的正式訂單，請檢查：'+unknown.join('、'):'');
+ $i('biWarning').innerHTML=low.length?'<div class="bi-alert"><b>⚠️ 庫存低於 3 顆（'+low.length+' 款）</b><div>'+low.map(x=>'<div>'+esc(x.name)+'：'+x.remaining+' 顆</div>').join('')+'</div></div>':'';
+ $i('biUnknown').textContent=(rows.filter(x=>x.opening===null).length+' 個菜單貝果尚未設定期初數量。')+
+ (ambiguous.length?' ⚠️ 同一貝果有不同名稱的期初紀錄，暫不合計，請核對後再輸入正確期初：'+ambiguous.join('；'):'')+
+ (legacy.length?' ⚠️ 菜單外的舊庫存資料已隱藏，但未刪除：'+legacy.join('；'):'')+
+ (unknown.length?' ⚠️ 無法對應菜單的正式訂單，請檢查：'+unknown.join('、'):'');
  const select=$i('biItem'),previous=select.value;
  select.innerHTML='<option value="">請選擇貝果口味</option>'+catalog.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');
  if(catalog.includes(previous))select.value=previous;
  $i('biHistory').innerHTML=ledger.length?[...ledger].reverse().map(x=>'<div class="bi-event">'+esc(x.event_date)+'｜'+esc(x.item_name)+'｜'+(x.event_type==='retail_sale'?'售出 −':x.event_type==='restock'?'補貨 +':'更正 +')+x.quantity+' 顆'+(x.note?'｜'+esc(x.note):'')+'</div>').join(''):'<p class="hint">本週尚無現場銷售或補貨紀錄。</p>';
  const dash=$i('biDashboardWarning');
- if(dash){if(week===sunday(tpeToday())&&loadedWeek===week&&low.length){dash.classList.remove('hidden');dash.innerHTML='<b>⚠️ 貝果庫存警示（剩餘少於 3 顆）</b><div class="bi-dashboard-low-list">'+low.map(x=>'<div>'+esc(x.name)+'：'+x.remaining+' 顆</div>').join('')+'</div><button type="button" onclick="tab(\'bagelInventory\')">查看庫存明細</button>'}else dash.classList.add('hidden')}
+ if(dash){if(week===sunday(tpeToday())&&loadedWeek===week&&low.length){
+ dash.classList.remove('hidden');
+ const first=low.slice(0,3),extra=low.slice(3);
+ dash.innerHTML='<b>⚠️ 貝果低庫存 '+low.length+' 款（少於 3 顆）</b><div class="bi-dashboard-low-list">'+first.map(x=>'<div>'+esc(x.name)+'：'+x.remaining+' 顆</div>').join('')+'</div>'+
+ (extra.length?'<details class="bi-low-more"><summary>展開其餘 '+extra.length+' 款低庫存</summary><div class="bi-dashboard-low-list">'+extra.map(x=>'<div>'+esc(x.name)+'：'+x.remaining+' 顆</div>').join('')+'</div></details>':'')+
+ '<button type="button" onclick="tab(\'bagelInventory\')">查看庫存明細</button>';
+ }else dash.classList.add('hidden')}
 }
 async function load(){
  if(!client||!session||!week)return;
