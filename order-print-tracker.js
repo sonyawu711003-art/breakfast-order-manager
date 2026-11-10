@@ -56,7 +56,10 @@ function ensureControls(){
 function cancelBatch(notify){
  if(printBusy)return;
  printBatch=null;elem('printAfterActions')?.classList.add('hidden');
+ if(elem('printDateFilter'))elem('printDateFilter').disabled=false;
+ if(elem('printMode'))elem('printMode').disabled=false;
  if(notify)elem('printTrackingStatus').textContent='本次未列印，所有訂單仍保留在待印清單。';
+ drawPrintCards();
 }
 async function fetchPrintLog(date,force=false){
  if(!client||!session||!date)return;
@@ -103,6 +106,8 @@ drawPrintCards=function(activeOrders){
  ensureControls();
  const select=elem('printDateFilter');
  if(!select)return;
+ // Do not silently change the print preview while the user is confirming a printed batch.
+ if(printBatch){elem('printOrderCards').disabled=true;return}
  const current=select.value;
  const valid=orders.filter(x=>x.status==='active');
  const dates=[...new Set(valid.map(x=>x.pickup_date))].sort();
@@ -147,6 +152,8 @@ printSelectedOrderCards=function(){
  const selected=mode==='all'?grouped:grouped.filter(x=>printedByKey.get(keyFor(x.date,x.customer))!==signature(x.lines));
  if(!selected.length)return;
  printBatch=selected.map(x=>({pickup_date:x.date,customer:x.customer,print_signature:signature(x.lines)}));
+ elem('printDateFilter').disabled=true;
+ elem('printMode').disabled=true;
  elem('printAfterActions').classList.remove('hidden');
  elem('printOrderCards').disabled=true;
  try{window.print()}catch(e){cancelBatch(true);alert('列印視窗未開啟：'+e.message)}
@@ -160,6 +167,7 @@ async function confirmBatch(){
   const {error}=await client.from('breakfast_order_print_log').upsert(batch,{onConflict:'pickup_date,customer'});
   if(error)throw error;
   printBatch=null;elem('printAfterActions').classList.add('hidden');
+  elem('printDateFilter').disabled=false;elem('printMode').disabled=false;
   const date=elem('printDateFilter').value;
   printLogLoadedFor='';await fetchPrintLog(date,true);
   elem('printTrackingStatus').textContent='✅ 已記錄 '+batch.length+' 張列印結果，兩位管理者同步；新訂單或後續異動會再顯示。';
