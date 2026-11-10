@@ -248,3 +248,15 @@ body:not(.login-mode) #dashboard #biDashboardWarning button{
 @media print{
  #printview .print-pending-badge{font-size:8pt;color:#222!important}
 }
+
+/* 首次補登已印訂單：不需要重新印全部訂單。 */
+#printview .print-baseline-panel{border:1.5px solid #e4bc86;background:#fff8eb;margin:12px 0;padding:12px;border-radius:14px}
+#printview .print-baseline-panel>summary{font-weight:850;cursor:pointer;color:#8d4a22;padding:4px 0;line-height:1.5}
+#printview .print-baseline-panel p{margin:9px 0}
+#printview .print-baseline-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-start}
+#printview .print-baseline-actions button{font-size:13px;padding:9px 12px}
+#printview .print-baseline-row{display:flex;align-items:center;gap:10px;padding:10px 4px;margin:0;border-bottom:1px solid #f0ddc3;cursor:pointer;font-size:14px;color:#643b24;font-weight:500}
+#printview .print-baseline-row input{flex:none;width:20px;height:20px;display:inline;margin:0}
+#printview .print-baseline-row span{line-height:1.45;overflow-wrap:anywhere}
+#printview #printBaselineSave{width:100%;margin-top:12px;background:#ba7137}
+@media print{#printview .print-baseline-panel{display:none!important}}
