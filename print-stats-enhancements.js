@@ -6,7 +6,7 @@ function amount(row){
  if(row.price===null||row.price===undefined||row.price==='')return null;
  return Number(row.price)*Number(row.quantity);
 }
-const specialPattern=/(?:不加|不要|不放|不奶油|不抹|不切|別放|去掉|去除|去邊|不烤|對切|分開(?:裝|放|包)?|另外(?:裝|放|包)?|少(?:醬|糖|冰|鹽|菜|辣)|多(?:醬|糖|冰|鹽|菜|辣)|無醬|醬(?:料)?(?:另外|分開)|素食|全素|蛋奶素|過敏|客製|加購|加蛋|加厚蛋|加起司|加培根|加(?:一|兩|1|2)球|一球馬鈴薯|換(?:成|掉)|待確認|備註|特殊需求)/i;
+const specialPattern=/(?:不用|不加|不要|不放|不奶油|不抹|不切|別放|去掉|去除|去邊|不烤|對切|分開(?:裝|放|包)?|另外(?:裝|放|包)?|少(?:醬|糖|冰|鹽|菜|辣)|多(?:醬|糖|冰|鹽|菜|辣)|無醬|醬(?:料)?(?:另外|分開)|素食|全素|蛋奶素|過敏|客製|加購|加蛋|加厚蛋|加起司|加培根|加(?:一|兩|1|2)球|一球馬鈴薯|換(?:成|掉)|待確認|備註|特殊需求)/i;
 // Only show an original LINE message on the date(s) it actually mentions.
 // Date-free customization notes belong to that database order's pickup date.
 function extractRequests(note,pickupDate){
@@ -36,12 +36,7 @@ function extractRequests(note,pickupDate){
    datePattern.lastIndex=0;
    continue;
   }
-  const first=matches[0];
-  const header=line.slice(0,first.index).trim();
-  if(header&&specialPattern.test(header)&&!datePattern.test(value.slice(0,value.indexOf(line)))) {
-   // Don't infer a date for a free-standing header preceding multiple dated lines.
-  }
-  // Each dated clause may start with one or several adjacent dates and/or an explicit range.
+    // Each dated clause may start with one or several adjacent dates and/or an explicit range.
   for(let i=0;i<matches.length;i++){
    const current=matches[i],next=matches[i+1];
    const here=extractDate(current[0]);if(here===null)continue;
