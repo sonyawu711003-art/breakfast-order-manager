@@ -133,13 +133,15 @@ function show(){
  if(catalog.includes(previous))select.value=previous;
  $i('biHistory').innerHTML=ledger.length?[...ledger].reverse().map(x=>'<div class="bi-event">'+esc(x.event_date)+'｜'+esc(x.item_name)+'｜'+(x.event_type==='retail_sale'?'售出 −':x.event_type==='restock'?'補貨 +':'更正 +')+x.quantity+' 顆'+(x.note?'｜'+esc(x.note):'')+'</div>').join(''):'<p class="hint">本週尚無現場銷售或補貨紀錄。</p>';
  const dash=$i('biDashboardWarning');
- // 統計頁只顯示尚有 1～2 顆的低庫存；0 顆仍留在完整庫存頁。
- const dashboardLow=low.filter(x=>x.remaining>0);
+ // 統計頁顯示負庫存（疑似超收）及剩餘 1～2 顆；0 顆不顯示。
+ // 負數優先置頂，讓管理者第一眼看見可能超收的品項。
+ const dashboardLow=low.filter(x=>x.remaining<0||x.remaining>0).sort((a,b)=>
+  (a.remaining<0?0:1)-(b.remaining<0?0:1)||a.remaining-b.remaining||a.name.localeCompare(b.name,'zh-TW'));
  if(dash){if(week===sunday(tpeToday())&&loadedWeek===week&&dashboardLow.length){
  dash.classList.remove('hidden');
  const first=dashboardLow.slice(0,3),extra=dashboardLow.slice(3);
- dash.innerHTML='<b>⚠️ 貝果低庫存 '+dashboardLow.length+' 款（剩餘 1～2 顆）</b><div class="bi-dashboard-low-list">'+first.map(x=>'<div>'+esc(x.name)+'：'+x.remaining+' 顆</div>').join('')+'</div>'+
- (extra.length?'<details class="bi-low-more"><summary>展開其餘 '+extra.length+' 款低庫存</summary><div class="bi-dashboard-low-list">'+extra.map(x=>'<div>'+esc(x.name)+'：'+x.remaining+' 顆</div>').join('')+'</div></details>':'')+
+ dash.innerHTML='<b>⚠️ 貝果庫存警示 '+dashboardLow.length+' 款（負數／剩餘 1～2 顆）</b><div class="bi-dashboard-low-list">'+first.map(x=>'<div>'+esc(x.name)+'：'+x.remaining+' 顆'+(x.remaining<0?' ⚠️ 超收／庫存不足':'')+'</div>').join('')+'</div>'+
+ (extra.length?'<details class="bi-low-more"><summary>展開其餘 '+extra.length+' 款低庫存</summary><div class="bi-dashboard-low-list">'+extra.map(x=>'<div>'+esc(x.name)+'：'+x.remaining+' 顆'+(x.remaining<0?' ⚠️ 超收／庫存不足':'')+'</div>').join('')+'</div></details>':'')+
  '<button type="button" onclick="tab(\'bagelInventory\')">查看庫存明細</button>';
  }else dash.classList.add('hidden')}
 }
