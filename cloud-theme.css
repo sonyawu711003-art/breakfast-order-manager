@@ -205,3 +205,28 @@ body:not(.login-mode) #mealStats .unpriced-warning{
 #bagelInventory .bi-event{padding:9px 0;border-bottom:1px solid #eee2d3;font-size:13px;line-height:1.5;overflow-wrap:anywhere}
 #biDashboardWarning{border:1.5px solid #e78b8b;background:#fff0f0;color:#b72525;padding:12px;border-radius:14px;margin-bottom:12px;font-weight:800;line-height:1.5;overflow-wrap:anywhere}
 #biDashboardWarning button{background:#b72525;margin-top:5px}
+
+/* 貝果低庫存：在統計頁的 KPI 卡片下直接提醒，同步庫存頁的同一份庫存資料。 */
+body:not(.login-mode) #dashboard #biDashboardWarning{
+ margin:12px 0 17px;
+ background:#fff0f0;
+ border:2px solid #d95b5b;
+ border-radius:15px;
+ padding:14px;
+ color:#b42323;
+ font-weight:850;
+ line-height:1.65;
+ overflow-wrap:anywhere;
+}
+body:not(.login-mode) #dashboard #biDashboardWarning .bi-dashboard-low-list{
+ margin:8px 0;
+ padding-left:8px;
+ border-left:3px solid #d95b5b;
+}
+body:not(.login-mode) #dashboard #biDashboardWarning .bi-dashboard-low-list>div{
+ padding:2px 0;
+}
+body:not(.login-mode) #dashboard #biDashboardWarning button{
+ background:#b42323;
+ margin-top:7px;
+}
