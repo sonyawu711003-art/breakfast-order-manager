@@ -17,7 +17,7 @@ function bagelName(item){
 function menuBagels(){
  // The cloud menu is the sole source of inventory item names.
  // Never replace it with historical imports or local fallback data.
- return liveBagelMenu===null?[]:liveBagelMenu.map(x=>x.name);
+ return liveBagelMenu===null?[]:liveBagelMenu.map(x=>x.name).filter(name=>name!=='草莓麻吉乳酪');
 }
 function canonicalBagel(name,names){
  if(names.includes(name))return name;
