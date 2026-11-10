@@ -224,7 +224,7 @@ async function confirmBatch(){
   const date=elem('printDateFilter').value;
   printLogLoadedFor='';await fetchPrintLog(date,true);
   elem('printTrackingStatus').textContent='✅ 已記錄 '+batch.length+' 張 PDF 匯出結果，兩位管理者同步；新訂單或後續異動會再顯示。';
- }catch(e){elem('printTrackingStatus').textContent='⚠️ 無法儲存列印紀錄：'+e.message+'，請勿重複匯出，先重試確認。'}
+ }catch(e){elem('printTrackingStatus').textContent='⚠️ 無法儲存 PDF 匯出紀錄：'+e.message+'，請勿重複匯出，先重試確認。'}
  finally{printBusy=false;elem('printConfirmBatch').disabled=false;drawPrintCards()}
 }
 const previousTab=tab;
