@@ -22,10 +22,54 @@ function card(group){
  (x.notes?'<div class="note">'+esc(x.notes)+'</div>':'')+'</div>').join('')+'</div>'+
  (live.length?'<button type="button" class="open-whole-order" data-open-order="'+esc(live[0].id)+'">✏️ 編輯整張訂單（新增／修改／刪除品項）</button>':'<p class="hint">全部品項已取消</p>')+'</section>';
 }
+// Local operational cutoff: 11:00 Asia/Taipei, irrespective of device timezone.
+function taipeiClock(date=new Date()){
+ const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(date);
+ const p=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+ return {day:p.year+'-'+p.month+'-'+p.day,hour:Number(p.hour),minute:Number(p.minute)};
+}
+function archivedDate(date,now=taipeiClock()){
+ return date<now.day||(date===now.day&&now.hour>=11);
+}
+function visibleCurrentOrder(row,now=taipeiClock()){
+ return !archivedDate(row.pickup_date,now);
+}
+function matchesSearch(group,search){
+ return !search||group.some(x=>[x.customer,x.pickup_date,x.item,x.notes].join(' ').toLowerCase().includes(search));
+}
+function historyCard(group){
+ const live=group.filter(x=>x.status==='active'),first=group[0];
+ const total=live.reduce((n,x)=>n+(amount(x)??0),0);
+ const incomplete=live.some(x=>amount(x)==null);
+ const items=group.map(x=>'<div class="history-line">'+esc(x.item)+' ×'+x.quantity+
+  (x.status==='cancelled'?'（已取消）':amount(x)==null?'（未定價）':'｜$'+amount(x).toFixed(0))+
+  (x.notes?'<div class="history-note">'+esc(x.notes)+'</div>':'')+'</div>').join('');
+ return '<details class="history-order-entry"><summary>'+esc(first.pickup_date)+'｜'+esc(first.customer)+'｜'+live.length+' 項｜$'+total.toFixed(0)+(incomplete?'＋未定價':'')+'</summary>'+
+  '<div class="history-lines">'+items+'</div></details>';
+}
+function drawHistoryOrders(now=taipeiClock()){
+ const dates=[...new Set(orders.filter(x=>archivedDate(x.pickup_date,now)).map(x=>x.pickup_date))].sort().reverse();
+ const select=el('archivedOrderDate');
+ if(!select)return;
+ const previous=select.value;
+ select.innerHTML='<option value="all">全部歷史日期</option>'+dates.map(date=>'<option value="'+esc(date)+'">'+esc(date)+'</option>').join('');
+ select.value=previous==='all'||dates.includes(previous)?previous:'all';
+ const query=el('archivedOrderSearch')?.value.trim().toLowerCase()||'';
+ const archived=orders.filter(x=>archivedDate(x.pickup_date,now)&&(select.value==='all'||x.pickup_date===select.value));
+ const result=grouped(archived).filter(group=>matchesSearch(group,query)).reverse();
+ el('archivedOrderCount').textContent=result.length+' 張歷史訂單｜只供查詢，不影響當日訂單、銷售統計或訂單卡列印。';
+ el('archivedOrderList').innerHTML=result.map(historyCard).join('')||'<p class="hint">沒有符合條件的歷史訂單。</p>';
+}
 function drawGrouped(){
+ const now=taipeiClock();
  const search=el('search')?.value.trim().toLowerCase()||'';
- const result=grouped(orders).filter(g=>!search||g.some(x=>[x.customer,x.pickup_date,x.item,x.notes].join(' ').toLowerCase().includes(search)));
- el('orderList').innerHTML=result.map(card).join('')||'<div class="card hint">沒有符合的客人訂單</div>';
+ const recent=orders.filter(x=>visibleCurrentOrder(x,now));
+ const result=grouped(recent).filter(g=>matchesSearch(g,search));
+ el('orderList').innerHTML=result.map(card).join('')||'<div class="card hint">目前沒有待處理的客人訂單。</div>';
+ const older=orders.filter(x=>archivedDate(x.pickup_date,now));
+ el('orderActiveSummary').textContent='待處理 '+result.length+' 張訂單｜台灣時間每日 11:00 自動將當日訂單移至「紀錄」，資料不刪除。';
+ el('orderArchivedHint').textContent=older.length?'另有 '+grouped(older).length+' 張歷史訂單可在「紀錄」查詢。':'';
+ drawHistoryOrders(now);
 }
 function sourceLines(group){return group.filter(x=>x.status==='active').map(x=>({id:x.id,version:x.version,item:x.item,quantity:x.quantity,price:x.price,total_override:x.total_override,notes:x.notes,remove:false}))}
 function editorChoices(){
@@ -125,6 +169,12 @@ async function saveWholeOrder(){
 function mount(){
  const current=el('orderList');
  if(!current||el('wholeOrderEditor'))return;
+ current.insertAdjacentHTML('beforebegin','<p id="orderActiveSummary" class="hint" aria-live="polite"></p><p id="orderArchivedHint" class="hint"></p>');
+ const history=el('history');
+ if(history){history.insertAdjacentHTML('beforeend','<section class="card" id="archivedOrdersPanel"><h3>📚 歷史客人訂單</h3><p class="hint">每天台灣時間 11:00 後自動歸檔當天訂單，所有原始品項、備註與金額保留供日後分析客人喜好。</p><label>歷史取餐日期<select id="archivedOrderDate"><option value="all">全部歷史日期</option></select></label><label>搜尋歷史客人或品項<input id="archivedOrderSearch" placeholder="輸入客人名稱或品項"></label><p id="archivedOrderCount" class="hint"></p><div id="archivedOrderList"></div></section>');
+ el('archivedOrderDate').addEventListener('change',()=>drawHistoryOrders());
+ el('archivedOrderSearch').addEventListener('input',()=>drawHistoryOrders());
+ }
  const legacy=current.nextElementSibling;
  legacy.id='legacySingleEditor';
  const form='<section id="wholeOrderEditor" class="card hidden" aria-label="整張訂單編輯">'+
@@ -157,5 +207,8 @@ function mount(){
 const originalDraw=draw;
 draw=function(){originalDraw();drawGrouped()};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
-window.BreakfastWholeOrderEditor={grouped,openEditor,drawGrouped};
+// Refresh the cutoff independently of user activity; 11:00 needs no manual reload.
+setInterval(()=>{if(typeof session!=='undefined'&&session&&document.visibilityState==='visible')drawGrouped()},60000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&typeof session!=='undefined'&&session)drawGrouped()});
+window.BreakfastWholeOrderEditor={grouped,openEditor,drawGrouped,drawHistoryOrders,taipeiClock,archivedDate,visibleCurrentOrder};
 })();
