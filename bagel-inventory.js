@@ -3,7 +3,7 @@
 'use strict';
 const $i=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let week='',stock=[],ledger=[],catalog=[],dirty=false,busy=false,fetching=false,pendingId=null,readSeq=0;
+let week='',stock=[],ledger=[],catalog=[],dirty=false,busy=false,fetching=false,pendingId=null,readSeq=0,loadedWeek='',reloadQueued=false;
 function tpeToday(date=new Date()){
  const p=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date).filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
  return p.year+'-'+p.month+'-'+p.day;
@@ -103,7 +103,8 @@ function show(){
  if(dash){if(week===sunday(tpeToday())&&low.length){dash.classList.remove('hidden');dash.innerHTML='<b>⚠️ 貝果低庫存：</b>'+low.map(x=>esc(x.name)+' '+x.remaining+' 顆').join('、')+' <button type="button" onclick="tab(\'bagelInventory\')">查看庫存</button>'}else dash.classList.add('hidden')}
 }
 async function load(){
- if(!client||!session||!week||fetching)return;
+ if(!client||!session||!week)return;
+ if(fetching){reloadQueued=true;return}
  fetching=true;const selected=week,seq=++readSeq;
  $i('biStatus').textContent='正在同步雲端庫存…';
  try{
@@ -113,10 +114,10 @@ async function load(){
   ]);
   if(a.error||b.error)throw new Error(a.error?.message||b.error?.message);
   if(week!==selected||seq!==readSeq)return;
-  stock=a.data||[];ledger=b.data||[];dirty=false;show();
+  stock=a.data||[];ledger=b.data||[];dirty=false;loadedWeek=selected;show();
   $i('biStatus').textContent='✅ 庫存已同步 '+new Date().toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei'});
  }catch(e){$i('biStatus').textContent='同步失敗：'+e.message}
- finally{fetching=false}
+ finally{fetching=false;if(reloadQueued){reloadQueued=false;load()}}
 }
 async function saveOpening(event){
  event.preventDefault();if(!client||!session||busy)return;
@@ -149,7 +150,15 @@ async function saveEvent(event){
 const oldTab=tab;
 tab=function(name){oldTab(name);if(name==='bagelInventory')load()};
 const oldDraw=draw;
-draw=function(){oldDraw();if(week&&$i('bagelInventory')&&!dirty)show()};
+draw=function(){
+ oldDraw();
+ if(!session||!$i('bagelInventory'))return;
+ const current=sunday(tpeToday()),screenVisible=!$i('bagelInventory').classList.contains('hidden');
+ // Default to a fresh Sunday week without taking the user away from deliberate history browsing.
+ if(!screenVisible&&!dirty&&week!==current){week=current;$i('biWeek').value=week;loadedWeek='';}
+ if(!dirty&&loadedWeek!==week&&!fetching)load();
+ else if(!dirty)show();
+};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
 setInterval(()=>{if(session&&document.visibilityState==='visible'&&!dirty&&week===sunday(tpeToday()))load()},90000);
 window.BreakfastBagelInventory={tpeToday,sunday,plusDays,model,load};
