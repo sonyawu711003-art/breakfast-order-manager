@@ -70,7 +70,7 @@ function mount(){
  '<div class="card"><h3>🕘 本週異動明細</h3><div id="biHistory"></div></div></section>'
  ].join(''));
  nav.insertAdjacentHTML('beforeend','<button onclick="tab(\'bagelInventory\')">庫存</button>');
- if($i('dashboard'))$i('dashboard').insertAdjacentHTML('afterbegin','<div id="biDashboardWarning" class="hidden" role="status"></div>');
+ if($i('dashboard')){const stats=$i('dashboard');const anchor=$i('cards');if(anchor)anchor.insertAdjacentHTML('afterend','<div id="biDashboardWarning" class="hidden" role="alert" aria-live="polite"></div>');else stats.insertAdjacentHTML('afterbegin','<div id="biDashboardWarning" class="hidden" role="alert" aria-live="polite"></div>');}
  week=sunday(tpeToday());$i('biWeek').value=week;
  $i('biWeek').addEventListener('change',()=>{
   if(dirty&&!confirm('期初庫存有未儲存的修改，確定切換週次？')){$i('biWeek').value=week;return}
@@ -100,7 +100,7 @@ function show(){
  if(catalog.includes(previous))select.value=previous;
  $i('biHistory').innerHTML=ledger.length?[...ledger].reverse().map(x=>'<div class="bi-event">'+esc(x.event_date)+'｜'+esc(x.item_name)+'｜'+(x.event_type==='retail_sale'?'售出 −':x.event_type==='restock'?'補貨 +':'更正 +')+x.quantity+' 顆'+(x.note?'｜'+esc(x.note):'')+'</div>').join(''):'<p class="hint">本週尚無現場銷售或補貨紀錄。</p>';
  const dash=$i('biDashboardWarning');
- if(dash){if(week===sunday(tpeToday())&&low.length){dash.classList.remove('hidden');dash.innerHTML='<b>⚠️ 貝果低庫存：</b>'+low.map(x=>esc(x.name)+' '+x.remaining+' 顆').join('、')+' <button type="button" onclick="tab(\'bagelInventory\')">查看庫存</button>'}else dash.classList.add('hidden')}
+ if(dash){if(week===sunday(tpeToday())&&loadedWeek===week&&low.length){dash.classList.remove('hidden');dash.innerHTML='<b>⚠️ 貝果庫存警示（剩餘少於 3 顆）</b><div class="bi-dashboard-low-list">'+low.map(x=>'<div>'+esc(x.name)+'：'+x.remaining+' 顆</div>').join('')+'</div><button type="button" onclick="tab(\'bagelInventory\')">查看庫存明細</button>'}else dash.classList.add('hidden')}
 }
 async function load(){
  if(!client||!session||!week)return;
