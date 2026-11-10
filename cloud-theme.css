@@ -85,3 +85,92 @@ body:not(.login-mode)>header .header-subline img{width:83px;height:61px;object-f
 #wholeOrderEditor .whole-order-summary strong{font-size:23px}
 #wholeOrderEditor #wholeOrderSave{width:100%;font-size:18px;min-height:55px;background:linear-gradient(115deg,#f59d35,#d97726)}
 #wholeOrderEditor #wholeOrderMessage:not(:empty){padding:8px;border-radius:9px;background:#fff3e5;line-height:1.5}
+
+/* 2026-11-10 訂單卡：合計淺灰底 12pt，原始客人留言細明體非粗體 8pt。 */
+body:not(.login-mode) #printview .print-card .print-total{
+ margin:3mm 0 1.5mm;
+ padding:1.5mm 2mm;
+ background:#e8e8e8!important;
+ color:#1f1f1f;
+ font-size:12pt!important;
+ line-height:1.35;
+ font-weight:700!important;
+ -webkit-print-color-adjust:exact;
+ print-color-adjust:exact;
+}
+body:not(.login-mode) #printview .print-card .print-total-amount{
+ font-size:12pt!important;
+ font-weight:700!important;
+}
+body:not(.login-mode) #printview .print-card .customer-message,
+body:not(.login-mode) #printview .print-card .customer-message-text,
+body:not(.login-mode) #printview .print-card .message-star{
+ font-family:"PMingLiU","MingLiU","新細明體","細明體","Noto Serif TC",serif!important;
+ font-size:8pt!important;
+ font-weight:400!important;
+ line-height:1.35;
+ color:#222;
+ white-space:pre-wrap;
+ overflow-wrap:anywhere;
+}
+body:not(.login-mode) #mealStats .daily-sales,
+body:not(.login-mode) #mealStats .all-dates-sales{
+ padding:10px 12px;
+ margin-top:10px;
+ border-radius:10px;
+ background:#fff1d6;
+ color:#793d18;
+ font-size:15px;
+ font-weight:700;
+}
+body:not(.login-mode) #mealStats .daily-sales strong,
+body:not(.login-mode) #mealStats .all-dates-sales strong{
+ font-size:19px;
+ margin-left:5px;
+}
+body:not(.login-mode) #mealStats .special-request-panel{
+ margin-top:14px;
+ padding:12px;
+ border-radius:12px;
+ border:1px solid #f1c6c6;
+ background:#fff9f9;
+}
+body:not(.login-mode) #mealStats .special-request-panel h4,
+body:not(.login-mode) #mealStats .special-request-line{
+ color:#c12525!important;
+}
+body:not(.login-mode) #mealStats .special-request-panel h4{
+ margin:0 0 8px;
+ font-weight:850;
+}
+body:not(.login-mode) #mealStats .special-request-line{
+ margin-top:7px;
+ padding:7px 0;
+ border-top:1px solid #f2d5d5;
+ font-size:14px;
+ line-height:1.5;
+ white-space:pre-wrap;
+ overflow-wrap:anywhere;
+}
+body:not(.login-mode) #mealStats .unpriced-warning{
+ color:#984200;
+ background:#fff1df;
+ border-radius:8px;
+ padding:8px;
+ font-size:13px;
+ line-height:1.5;
+}
+@media print{
+ body:not(.login-mode) #printview .print-card .print-total{
+   background:#e8e8e8!important;
+   font-size:12pt!important;
+   -webkit-print-color-adjust:exact!important;
+   print-color-adjust:exact!important;
+ }
+ body:not(.login-mode) #printview .print-card .customer-message,
+ body:not(.login-mode) #printview .print-card .customer-message-text{
+   font-family:"PMingLiU","MingLiU","新細明體","細明體","Noto Serif TC",serif!important;
+   font-size:8pt!important;
+   font-weight:400!important;
+ }
+}
