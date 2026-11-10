@@ -40,6 +40,13 @@ function ensureControls(){
  '<option value="all">重新列印所選日期全部訂單</option>',
  '</select></label>',
  '<p id="printTrackingStatus" class="hint" aria-live="polite">正在載入共用列印紀錄…</p>',
+ '<details id="printPrintedBaseline" class="card print-baseline-panel">',
+ '<summary>📌 設定以前已印過的訂單（不重新列印）</summary>',
+ '<p class="hint">第一次使用必須先補登已經印出的訂單。只勾選確實印過的客人訂單；尚未印過的不要勾。完成後，「只印新增／異動」才會正確排除舊單。</p>',
+ '<div class="row print-baseline-actions"><button type="button" class="secondary" id="printBaselineSelectAll">全選未記錄訂單</button><button type="button" class="secondary" id="printBaselineClear">全部取消勾選</button></div>',
+ '<div id="printBaselineList"></div>',
+ '<button type="button" id="printBaselineSave">✅ 把勾選的訂單設為已印（不列印）</button>',
+ '</details>',
  '<div id="printAfterActions" class="card hidden">',
  '<b>🖨️ 列印視窗已開啟</b>',
  '<p class="hint">請確認紙張或 PDF 已成功輸出，再按「確認已列印」。若取消列印，請選「這次沒有印出」，訂單仍會保留在待印清單。</p>',
@@ -48,6 +55,10 @@ function ensureControls(){
  '</div>'
  ].join(''));
  elem('printMode').addEventListener('change',()=>{cancelBatch(false);drawPrintCards()});
+ elem('printBaselineSelectAll').addEventListener('click',()=>elem('printBaselineList').querySelectorAll('input[type="checkbox"]').forEach(x=>x.checked=true));
+ elem('printBaselineClear').addEventListener('click',()=>elem('printBaselineList').querySelectorAll('input[type="checkbox"]').forEach(x=>x.checked=false));
+ elem('printBaselineSave').addEventListener('click',saveBaseline);
+
  elem('printConfirmBatch').addEventListener('click',confirmBatch);
  elem('printDiscardBatch').addEventListener('click',()=>cancelBatch(true));
  const btn=elem('printOrderCards');
@@ -102,6 +113,47 @@ async function fetchPrintLog(date,force=false){
   }
  }
 }
+
+function renderBaseline(date,allGroups,ready){
+ const list=elem('printBaselineList'),panel=elem('printPrintedBaseline');
+ if(!list||!panel)return;
+ if(!ready){list.innerHTML='<p class="hint">正在確認雲端列印紀錄…</p>';elem('printBaselineSave').disabled=true;return}
+ if(date==='all'){
+  list.innerHTML='<p class="hint">請先選擇一個取餐日期，再勾選該日期已經印過的訂單。</p>';
+  elem('printBaselineSave').disabled=true;return;
+ }
+ const missing=allGroups.filter(g=>!printedByKey.has(keyFor(g.date,g.customer)));
+ elem('printBaselineSave').disabled=printBusy||!!printBatch||!missing.length;
+ list.innerHTML=missing.map((group,index)=>{
+  const quantity=group.lines.reduce((sum,row)=>sum+Number(row.quantity),0);
+  return '<label class="print-baseline-row"><input type="checkbox" value="'+index+'"><span><strong>'+escapeText(group.customer)+'</strong>｜'+group.lines.length+' 種品項，'+quantity+' 件</span></label>';
+ }).join('')||'<p class="hint">所選日期全部客人訂單都已有列印紀錄；若後續改單，仍會自動列入補印。</p>';
+ panel.dataset.baselineDate=date;
+}
+async function saveBaseline(){
+ if(printBusy||printBatch||!client||!session)return;
+ const date=elem('printDateFilter')?.value;
+ if(date!=='all'&&date!==printLogLoadedFor)return;
+ if(date==='all'){alert('請先選擇單一取餐日期');return}
+ const groups=groupedActive(date).filter(g=>!printedByKey.has(keyFor(g.date,g.customer)));
+ const checked=[...elem('printBaselineList').querySelectorAll('input[type="checkbox"]:checked')]
+  .map(x=>groups[Number(x.value)]).filter(Boolean);
+ if(!checked.length){alert('請先勾選已經實際列印過的客人訂單');return}
+ if(!confirm('確定以下 '+checked.length+' 張訂單卡「以前就已印過」？\n這次不會列印任何紙張；勾選的訂單將從待印名單移除，未勾選仍可補印。'))return;
+ printBusy=true;
+ elem('printBaselineSave').disabled=true;
+ const batch=checked.map(g=>({pickup_date:g.date,customer:g.customer,print_signature:signature(g.lines)}));
+ try{
+  const {error}=await client.from('breakfast_order_print_log').upsert(batch,{onConflict:'pickup_date,customer'});
+  if(error)throw error;
+  printLogLoadedFor='';
+  await fetchPrintLog(date,true);
+  if(elem('printPrintedBaseline'))elem('printPrintedBaseline').open=false;
+  if(elem('printTrackingStatus'))elem('printTrackingStatus').textContent='✅ 已補登 '+batch.length+' 張過去已印訂單，未勾選的訂單保留待印。';
+ }catch(e){
+  elem('printTrackingStatus').textContent='⚠️ 補登列印紀錄失敗：'+e.message+'，請確認後再操作。';
+ }finally{printBusy=false;drawPrintCards()}
+}
 drawPrintCards=function(activeOrders){
  ensureControls();
  const select=elem('printDateFilter');
@@ -129,7 +181,8 @@ drawPrintCards=function(activeOrders){
  const grouped=groupedActive(date);
  const pending=grouped.filter(group=>printedByKey.get(keyFor(group.date,group.customer))!==signature(group.lines));
  const selected=mode==='all'?grouped:(ready?pending:[]);
- const extra=mode==='pending'?'｜待印 '+(ready?pending.length:'讀取中')+' 張':'｜本次全部 '+grouped.length+' 張';
+ renderBaseline(date,grouped,ready);
+ const extra=mode==='pending'?'｜待印 '+(ready?pending.length:'讀取中')+' 張｜已記錄 '+(ready?grouped.length-pending.length:'讀取中')+' 張':'｜本次全部 '+grouped.length+' 張';
  elem('printOrderCards').disabled=printBusy||!selected.length||!ready||!!printBatch;
  elem('printEmpty').classList.toggle('hidden',selected.length>0);
  elem('printDateSummary').textContent=(date==='all'?'全部日期':'取餐日 '+date)+'｜有效 '+grouped.length+' 張訂單卡'+extra;
@@ -140,7 +193,7 @@ drawPrintCards=function(activeOrders){
  }).join('');
  if(ready&&!printBatch){
   elem('printTrackingStatus').textContent=mode==='pending'?
-   (pending.length?'本次待印 '+pending.length+' 張；印出後請確認，才會從待印名單移除。':'✅ 目前所選日期沒有待補印的新訂單或異動訂單。'):
+   (pending.length?'本次待印 '+pending.length+' 張。若以前已印過、但系統沒有紀錄，請先展開「設定以前已印過的訂單」勾選補登，避免重印。':'✅ 目前所選日期沒有待補印的新訂單或異動訂單。'):
    '目前選擇重新列印全部訂單，列印後仍需確認以更新列印紀錄。';
  }
 };
