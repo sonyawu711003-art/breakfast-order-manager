@@ -135,7 +135,7 @@ function show(){
  const dash=$i('biDashboardWarning');
  // 統計頁顯示負庫存（疑似超收）及剩餘 1～2 顆；0 顆不顯示。
  // 負數優先置頂，讓管理者第一眼看見可能超收的品項。
- const dashboardLow=low.filter(x=>x.remaining<0||x.remaining>0).sort((a,b)=>
+ const dashboardLow=low.filter(x=>x.remaining<0||(x.remaining>0&&x.remaining<3)).sort((a,b)=>
   (a.remaining<0?0:1)-(b.remaining<0?0:1)||a.remaining-b.remaining||a.name.localeCompare(b.name,'zh-TW'));
  if(dash){if(week===sunday(tpeToday())&&loadedWeek===week&&dashboardLow.length){
  dash.classList.remove('hidden');
