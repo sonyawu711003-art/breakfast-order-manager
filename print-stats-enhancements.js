@@ -7,8 +7,68 @@ function amount(row){
  return Number(row.price)*Number(row.quantity);
 }
 const specialPattern=/(?:不加|不要|不放|不奶油|不抹|不切|別放|去掉|去除|去邊|不烤|對切|分開(?:裝|放|包)?|另外(?:裝|放|包)?|少(?:醬|糖|冰|鹽|菜|辣)|多(?:醬|糖|冰|鹽|菜|辣)|無醬|醬(?:料)?(?:另外|分開)|素食|全素|蛋奶素|過敏|客製|加購|加蛋|加厚蛋|加起司|加培根|加(?:一|兩|1|2)球|一球馬鈴薯|換(?:成|掉)|待確認|備註|特殊需求)/i;
-function extractRequests(note){
- return String(note||'').replace(/\r\n?/g,'\n').split('\n').map(x=>x.trim()).filter(x=>x&&specialPattern.test(x));
+// Only show an original LINE message on the date(s) it actually mentions.
+// Date-free customization notes belong to that database order's pickup date.
+function extractRequests(note,pickupDate){
+ const value=String(note||'').replace(/\r\n?/g,'\n').trim();
+ if(!value)return [];
+ if(!pickupDate)return value.split('\n').map(x=>x.trim()).filter(x=>x&&specialPattern.test(x));
+ const [year,month,day]=pickupDate.split('-').map(Number);
+ const target=year*10000+month*100+day;
+ const datePattern=/(?:20\d{2}[\/.\-年])?\d{1,2}\s*[\/.\-月]\s*\d{1,2}(?:日)?/g;
+ const extractDate=token=>{
+  const match=token.match(/^(?:(20\d{2})[\/.\-年])?(\d{1,2})\s*[\/.\-月]\s*(\d{1,2})/);
+  if(!match)return null;
+  const yy=Number(match[1]||year),mm=Number(match[2]),dd=Number(match[3]);
+  const d=new Date(yy,mm-1,dd);
+  if(d.getFullYear()!==yy||d.getMonth()!==mm-1||d.getDate()!==dd)return null;
+  return yy*10000+mm*100+dd;
+ };
+ const matched=[];
+ // Split messages with multiple dates on the same line too:
+ // "11/10 不加醬，11/11 正常" should only flag 11/10.
+ for(const line of value.split('\n').map(x=>x.trim()).filter(Boolean)){
+  const matches=[...line.matchAll(datePattern)];
+  if(!matches.length){
+   // A date-free note in a longer multi-day LINE message must not leak into every day.
+   // It is safe to assign this only when the message has no dated entries.
+   if(!datePattern.test(value)&&specialPattern.test(line))matched.push(line);
+   datePattern.lastIndex=0;
+   continue;
+  }
+  const first=matches[0];
+  const header=line.slice(0,first.index).trim();
+  if(header&&specialPattern.test(header)&&!datePattern.test(value.slice(0,value.indexOf(line)))) {
+   // Don't infer a date for a free-standing header preceding multiple dated lines.
+  }
+  // Each dated clause may start with one or several adjacent dates and/or an explicit range.
+  for(let i=0;i<matches.length;i++){
+   const current=matches[i],next=matches[i+1];
+   const here=extractDate(current[0]);if(here===null)continue;
+   const between=line.slice(current.index+current[0].length,next?next.index:line.length);
+   const justSeparator=/^\s*(?:[、,，+＆&／/~～\-至到]|\s)*\s*$/.test(between);
+   if(next&&justSeparator)continue; // date-list group; process at final date in group
+   let dates=[here],start=i;
+   while(start>0){
+    const preceding=matches[start-1];
+    const separator=line.slice(preceding.index+preceding[0].length,matches[start].index);
+    if(!/^\s*[、,，+＆&／/~～\-至到]\s*$/.test(separator))break;
+    start--;
+    const previous=extractDate(matches[start][0]);
+    if(previous!==null)dates.unshift(previous);
+   }
+   const segment=line.slice(current.index+current[0].length,next?next.index:line.length).trim();
+   if(!segment||!specialPattern.test(segment))continue;
+   let applies=dates.includes(target);
+   const rangeParts=line.slice(matches[start].index+matches[start][0].length,current.index);
+   if(dates.length===2&&/[-~～至到]/.test(rangeParts)){
+    const first=dates[0],last=dates[1];
+    applies=target>=Math.min(first,last)&&target<=Math.max(first,last);
+   }
+   if(applies)matched.push(segment.replace(/^[\s、,，+＆&／/~～\-至到]+/,'').trim());
+  }
+ }
+ return [...new Set(matched.filter(Boolean))];
 }
 function finance(rows){
  return {sum:rows.reduce((a,x)=>a+(amount(x)??0),0),missing:rows.filter(x=>amount(x)===null)};
@@ -41,7 +101,7 @@ drawMealStats=function(dates,groups){
   const requests=new Map();
   for(const row of dayLines){
    const customer=String(row.customer||'').trim();
-   for(const request of extractRequests(row.notes)){
+   for(const request of extractRequests(row.notes,date)){
     const key=customer+'|'+request;
     if(!requests.has(key))requests.set(key,{customer,request});
    }
