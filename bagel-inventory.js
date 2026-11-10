@@ -3,7 +3,7 @@
 'use strict';
 const $i=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let week='',stock=[],ledger=[],catalog=[],dirty=false,busy=false,fetching=false,pendingId=null,readSeq=0,loadedWeek='',reloadQueued=false;
+let week='',stock=[],ledger=[],catalog=[],liveBagelMenu=null,dirty=false,busy=false,fetching=false,pendingId=null,readSeq=0,loadedWeek='',reloadQueued=false;
 function tpeToday(date=new Date()){
  const p=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date).filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
  return p.year+'-'+p.month+'-'+p.day;
@@ -15,8 +15,9 @@ function bagelName(item){
  try{return bagelNameLookup()(item)||null}catch(e){return null}
 }
 function menuBagels(){
- const rows=(typeof menuRows!=='undefined'&&menuRows.length?menuRows:(window.BREAKFAST_GOOGLE_MENU_20261108||[]));
- return [...new Set(rows.filter(x=>x.category==='貝果'&&x.active!==false).map(x=>String(x.name).trim()).filter(Boolean))];
+ // The cloud menu is the sole source of inventory item names.
+ // Never replace it with historical imports or local fallback data.
+ return liveBagelMenu===null?[]:liveBagelMenu.map(x=>x.name);
 }
 function canonicalBagel(name,names){
  if(names.includes(name))return name;
@@ -63,10 +64,14 @@ function model(){
  catalog=names;
  const rows=names.map(name=>{
   const sources=stockGroups.get(name)||[];
-  // Never sum two distinct opening inventory records, even when their aliases match.
-  // Leave duplicate stock unresolved for manager review to avoid inventing inventory.
-  if(sources.length>1)ambiguous.push(name+'：'+sources.map(x=>x.item_name+' '+x.opening_qty+' 顆').join('／'));
-  const source=sources.length===1?sources[0]:null;
+  // Exact canonical menu-name row takes precedence over historic name variants.
+  // Multiple legacy aliases must NOT be summed into the existing quantity.
+  const exact=sources.filter(x=>x.item_name===name);
+  const source=exact.length===1?exact[0]:sources.length===1?sources[0]:null;
+  if(sources.length>1){
+   ambiguous.push(name+'：本次採用 '+(source?source.item_name+' '+source.opening_qty+' 顆':'尚待核對')+
+    '；其他紀錄 '+sources.filter(x=>x!==source).map(x=>x.item_name+' '+x.opening_qty+' 顆').join('／'));
+  }
   const m=movement.get(name)||{retail:0,restock:0,correction:0};
   const opening=source?Number(source.opening_qty):null,reserved=booked.get(name)||0;
   const remaining=opening===null?null:opening+m.restock+m.correction-reserved-m.retail;
@@ -83,7 +88,7 @@ function mount(){
  '<div class="row"><b id="biRange"></b><button type="button" class="secondary" id="biRefresh">更新庫存</button></div>',
  '<p id="biStatus" class="hint" role="status"></p></div>',
  '<div id="biWarning" role="alert"></div>',
- '<div class="card"><h3>📦 每週期初庫存</h3><p class="hint">空白＝未設定；填 0＝零庫存。整週自動扣除已確認訂單。</p>',
+ '<div class="card"><h3>📦 每週期初庫存</h3><p class="hint" id="biMenuSource">正在同步正式菜單的貝果品項…</p><p class="hint">空白＝未設定；填 0＝零庫存。整週自動扣除已確認訂單。</p>',
  '<form id="biOpeningForm"><div id="biOpenRows"></div><button type="submit" id="biSaveOpening">儲存本週期初庫存</button></form></div>',
  '<div class="card"><h3>📊 本週庫存與訂單預留</h3>',
  '<p class="hint">可用庫存＝期初＋補貨＋零售更正−本週有效訂單−現場零售；尚未核准的訂單不計入。</p>',
@@ -117,6 +122,9 @@ function mount(){
 function show(){
  if(!$i('bagelInventory')||!week)return;
  const {rows,unknown,legacy,ambiguous}=model(),low=rows.filter(x=>x.low);
+ $i('biMenuSource').textContent=liveBagelMenu===null?'⚠️ 尚未取得正式雲端菜單，請按「更新庫存」重試。':'✅ 完全依據雲端「菜單及價格管理」之啟用貝果：'+rows.length+' 款。品項變更請先到菜單修改。';
+ $i('biSaveOpening').disabled=busy||liveBagelMenu===null;
+ $i('biSaveEvent').disabled=busy||liveBagelMenu===null;
  $i('biRange').textContent=week+' ～ '+endOfWeek();
  const date=$i('biDate'),today=tpeToday();
  date.min=week;date.max=endOfWeek();
@@ -151,19 +159,26 @@ async function load(){
  fetching=true;const selected=week,seq=++readSeq;
  $i('biStatus').textContent='正在同步雲端庫存…';
  try{
-  const [a,b]=await Promise.all([
+  const [a,b,menu]=await Promise.all([
    client.from('breakfast_bagel_weekly_stock').select('*').eq('week_start',selected),
-   client.from('breakfast_bagel_inventory_events').select('*').eq('week_start',selected).order('created_at')
+   client.from('breakfast_bagel_inventory_events').select('*').eq('week_start',selected).order('created_at'),
+   client.from('breakfast_menu').select('name,category,active').eq('category','貝果').eq('active',true).order('name')
   ]);
-  if(a.error||b.error)throw new Error(a.error?.message||b.error?.message);
+  if(a.error||b.error||menu.error)throw new Error(a.error?.message||b.error?.message||menu.error?.message);
   if(week!==selected||seq!==readSeq)return;
+  const unique=new Map();
+  for(const item of menu.data||[]){
+   const name=String(item.name||'').trim();
+   if(name&&!unique.has(name))unique.set(name,{name});
+  }
+  liveBagelMenu=[...unique.values()];
   stock=a.data||[];ledger=b.data||[];dirty=false;loadedWeek=selected;show();
   $i('biStatus').textContent='✅ 庫存已同步 '+new Date().toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei'});
  }catch(e){$i('biStatus').textContent='同步失敗：'+e.message}
  finally{fetching=false;if(reloadQueued){reloadQueued=false;load()}}
 }
 async function saveOpening(event){
- event.preventDefault();if(!client||!session||busy)return;
+ event.preventDefault();if(!client||!session||busy||liveBagelMenu===null)return;
  const entries=[...$i('biOpenRows').querySelectorAll('[data-bi-name]')].filter(x=>x.value!=='').map(x=>({week_start:week,item_name:x.dataset.biName,opening_qty:Number(x.value)}));
  if(!entries.length){alert('至少填入一項期初庫存');return}
  if(entries.some(x=>!Number.isInteger(x.opening_qty)||x.opening_qty<0||x.opening_qty>99999)){alert('期初數量需為 0～99999 的整數');return}
@@ -176,7 +191,7 @@ async function saveOpening(event){
  finally{busy=false;$i('biSaveOpening').disabled=false}
 }
 async function saveEvent(event){
- event.preventDefault();if(!client||!session||busy)return;
+ event.preventDefault();if(!client||!session||busy||liveBagelMenu===null)return;
  const date=$i('biDate').value,item=$i('biItem').value,type=$i('biType').value,quantity=Number($i('biQty').value),note=$i('biNote').value.trim();
  if(date<week||date>endOfWeek()||!catalog.includes(item)||!['retail_sale','restock','sale_correction'].includes(type)||!Number.isInteger(quantity)||quantity<1){alert('請檢查日期、口味與數量');return}
  if(!confirm('確認記錄 '+date+' '+item+' '+quantity+' 顆 '+(type==='retail_sale'?'現場零售':type==='restock'?'補貨':'退回更正')+'？'))return;
