@@ -174,3 +174,15 @@ body:not(.login-mode) #mealStats .unpriced-warning{
    font-weight:400!important;
  }
 }
+
+/* 2026-11-10 11:00 Taipei cutoff: active order page stays short, archive is searchable. */
+#orderActiveSummary{margin:10px 0;padding:10px 12px;border-radius:12px;background:#fff1d6;color:#85512e;font-weight:750}
+#orderArchivedHint{margin:7px 0 12px;color:#85512e}
+#archivedOrdersPanel{border:1.5px solid #ead4b7;background:#fffcf5;border-radius:18px}
+#archivedOrdersPanel h3{margin:0 0 8px;color:#79421f}
+#archivedOrdersPanel .history-order-entry{background:#fff;border:1px solid #edd9c0;border-radius:12px;margin:9px 0;padding:11px 12px}
+#archivedOrdersPanel .history-order-entry>summary{cursor:pointer;font-weight:700;color:#70422a;line-height:1.5}
+#archivedOrdersPanel .history-line{padding:8px 0;border-bottom:1px solid #f1e7dc;font-size:14px}
+#archivedOrdersPanel .history-line:last-child{border-bottom:0}
+#archivedOrdersPanel .history-note{font-weight:400;font-size:12px;color:#8b603f;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px}
+#archivedOrdersPanel #archivedOrderCount{margin:10px 0}
