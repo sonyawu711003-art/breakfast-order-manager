@@ -186,3 +186,22 @@ body:not(.login-mode) #mealStats .unpriced-warning{
 #archivedOrdersPanel .history-line:last-child{border-bottom:0}
 #archivedOrdersPanel .history-note{font-weight:400;font-size:12px;color:#8b603f;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px}
 #archivedOrdersPanel #archivedOrderCount{margin:10px 0}
+
+/* Weekly bagel inventory: dashboard warnings and compact mobile-first stock table. */
+#bagelInventory .card{border-radius:18px}
+#bagelInventory h2{color:#7d3d1c}
+#bagelInventory .bi-open-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #f2e3d0;padding:8px 0;font-weight:700}
+#bagelInventory .bi-open-row span{flex:1;font-size:14px;color:#764326}
+#bagelInventory .bi-open-row input{width:112px;max-width:35%;margin:0;background:#fffaf0;text-align:center}
+#bagelInventory #biSaveOpening,#bagelInventory #biSaveEvent{width:100%;margin:14px 0 3px;background:linear-gradient(110deg,#ec9e49,#d16c28)}
+#bagelInventory .bi-table-wrap{width:100%;overflow-x:auto}
+#bagelInventory .bi-table{border-collapse:collapse;width:100%;min-width:545px;font-size:13px}
+#bagelInventory .bi-table th,#bagelInventory .bi-table td{padding:9px 7px;text-align:right;border-bottom:1px solid #efdfc9;white-space:nowrap}
+#bagelInventory .bi-table td:first-child,#bagelInventory .bi-table th:first-child{text-align:left;white-space:normal;min-width:150px}
+#bagelInventory .bi-table th{background:#fff0d8;color:#764326}
+#bagelInventory .bi-table .bi-low{background:#fff2f2}
+#bagelInventory .bi-table .bi-low-number{font-weight:950;color:#ba2323}
+#bagelInventory .bi-alert{border-radius:14px;border:2px solid #eb8686;background:#fff0f0;color:#bd2121;padding:13px;line-height:1.7;font-weight:850;overflow-wrap:anywhere}
+#bagelInventory .bi-event{padding:9px 0;border-bottom:1px solid #eee2d3;font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+#biDashboardWarning{border:1.5px solid #e78b8b;background:#fff0f0;color:#b72525;padding:12px;border-radius:14px;margin-bottom:12px;font-weight:800;line-height:1.5;overflow-wrap:anywhere}
+#biDashboardWarning button{background:#b72525;margin-top:5px}
