@@ -230,3 +230,11 @@ body:not(.login-mode) #dashboard #biDashboardWarning button{
  background:#b42323;
  margin-top:7px;
 }
+
+/* Compact statistics: show at most three low-stock products until manually expanded. */
+#dashboard #biDashboardWarning .bi-low-more{margin:5px 0 0;padding:0}
+#dashboard #biDashboardWarning .bi-low-more summary{cursor:pointer;color:#a91f1f;font-size:13px;font-weight:750;line-height:1.5}
+#dashboard #biDashboardWarning .bi-low-more .bi-dashboard-low-list{margin-top:6px;padding-left:8px}
+#bagelInventory #biUnknown{line-height:1.6;overflow-wrap:anywhere}
+#bagelInventory .bi-alert>div{margin-top:8px}
+#bagelInventory .bi-alert>div>div{padding:2px 0}
