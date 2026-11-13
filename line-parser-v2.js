@@ -6,7 +6,7 @@
 const dateRE=/(?:20\d{2}[\/.年-])?(\d{1,2})\s*[\/.月-]\s*(\d{1,2})(?:日)?(?:\s*\([一二三四五六日]\))?/g;
 const ignored=/^(?:【截圖\d+】|昨天|今天|已讀\s*\d+|以上收到|謝謝|感謝|收到|@|訂購方式|NEW|想預訂的朋友|汐科站|週二至週五)/i;
 const catalog=[
-'抹茶開心果','咖啡核桃','蔓越莓玫瑰紅寶石','蔓越莓紅寶石','巧克力阿華田','巧克力藍莓乳酪','南瓜焦糖乳酪',
+'抹茶開心果','咖啡核桃','蔓越莓玫瑰紅寶石','蔓越莓紅寶石','巧克力阿華田','巧克力藍莓乳酪','藍莓乳酪','南瓜焦糖乳酪',
 '鐵觀音桂圓','松露鹽之花','蜂蜜燕麥','起司三重奏','原味明太子','明太子貝果','大甲芋頭',
 '原味明太子','原味肉桂','原味明太子','巧克力阿華田','阿華田','芋頭','抹茶卡士達',
 '巧克力阿華田','抹茶開心果','原味明太子','巧克力藍莓',
@@ -45,8 +45,9 @@ const ds=dates(s,ctx.year);if(!ds.length&&!ctx.defaultDate)return [];const hits=
 const result=[];for(let i=0;i<hits.length;i++){const hit=hits[i];let day=ctx.defaultDate||'';for(const d of ds){if(d.start<hit.start)day=d.date}
 const next=hits[i+1];const quantity=qtyAfter(s.slice(hit.end,next?.start||s.length));const flexible=/(?:任一|任一天|其中一天|擇一|隨便一天)/.test(s)&&ds.length>1; if(flexible)day='';
 const unknownMultipleDates=ds.length>1&&ds.every(d=>d.start<hit.start)&&!/(?:各|每[天日])/.test(s);if(unknownMultipleDates)day='';
-const uncertain=!ctx.customer||!day||!Number.isInteger(quantity)||quantity<1||quantity>50;
-result.push({customer:ctx.customer||'',date:day,item:hit.item,qty:quantity,notes:s,mode:/取消|退訂|不要了/.test(s)?'cancel':/改成|改期|改為|更改|換成|修改/.test(s)?'edit':'add',reviewRequired:uncertain||/取消|更改|改期|改成|改為|換成|追加|改訂/.test(s),reason:!ctx.customer?'無法確認發言者':flexible?'跨日期任選一天，需請客人確認':unknownMultipleDates?'多個日期未清楚分配品項':!day?'取餐日期不明':'需比對原訂單',sourceIndex:ctx.sourceIndex??0,line:ctx.lineNo??0})}// Explicitly paired pickup dates before a shared item list mean EACH date gets ALL items.
+const genericBlueberry=hit.item==='藍莓乳酪';
+const uncertain=genericBlueberry||!ctx.customer||!day||!Number.isInteger(quantity)||quantity<1||quantity>50;
+result.push({customer:ctx.customer||'',date:day,item:hit.item,qty:quantity,notes:s,mode:/取消|退訂|不要了/.test(s)?'cancel':/改成|改期|改為|更改|換成|修改/.test(s)?'edit':'add',reviewRequired:uncertain||/取消|更改|改期|改成|改為|換成|追加|改訂/.test(s),reason:!ctx.customer?'無法確認發言者':flexible?'跨日期任選一天，需請客人確認':unknownMultipleDates?'多個日期未清楚分配品項':!day?'取餐日期不明':genericBlueberry?'「藍莓乳酪」為簡稱，須核對正式菜單品項':'需比對原訂單',sourceIndex:ctx.sourceIndex??0,line:ctx.lineNo??0})}// Explicitly paired pickup dates before a shared item list mean EACH date gets ALL items.
 // e.g. "11/10＋11/11 咖啡核桃＋紅茶" => 4 individual order lines.
 // Distinguish this from "11/10-11/12 任一天", which remains unresolved.
 if(ds.length>1&&ds.every(d=>d.start<hits[0].start)&&
