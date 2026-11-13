@@ -107,6 +107,20 @@ function closeEditor(force=false){
  el('wholeOrderEditor').classList.add('hidden');
  el('legacySingleEditor').classList.remove('hidden');
 }
+function startManualOrder(){
+ if(busy)return;
+ if(editing&&dirty&&!confirm('目前整張訂單有未儲存的修改，確定放棄並手動新增訂單？'))return;
+ if(typeof orderSaving!=='undefined'&&orderSaving)return;
+ editing=null;dirty=false;
+ el('wholeOrderEditor')?.classList.add('hidden');
+ el('legacySingleEditor')?.classList.remove('hidden');
+ clearForm();
+ el('formTitle').textContent='＋ 手動新增訂單';
+ el('pickup').value=taipeiClock().day;
+ el('legacySingleEditor').scrollIntoView({behavior:'smooth',block:'start'});
+ el('customer').focus({preventScroll:true});
+}
+window.startManualOrder=startManualOrder;
 function openEditor(id){
  const selected=orders.find(x=>x.id===id&&x.status==='active');
  if(!selected)return;
