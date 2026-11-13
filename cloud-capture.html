@@ -72,7 +72,7 @@ function normalizeCandidateItem(p){
   p.catalogStatus='matched';p.catalogHint=initial===p.item?'':'由「'+initial+'」對應正式菜單「'+p.item+'」';
  }else{
   p.catalogStatus=found.status;
-  p.catalogHint=found.status==='ambiguous'?'「'+initial+'」可能是：'+found.matches.map(x=>x.name).join('、')+'；請選擇正式品名':'「'+initial+'」未能唯一對應菜單，請確認品項';
+  p.catalogHint=found.status==='ambiguous'?'「'+initial+'」可能是：'+found.matches.map(x=>x.name).join('、')+'；請從下拉選單確認正式品名':'「'+initial+'」尚未匹配到菜單；已保留原始數量，請從下拉選單選擇正式品項';
   p.price='';p.flag=true;p.reason=p.catalogHint;
  }
 }
@@ -140,6 +140,16 @@ async function importChatTxt(){
  $('rawText').value=t;selectedFiles=[];fileHashes=[];fileTexts=[];
  $('scanMsg').textContent='已匯入 LINE TXT '+f.name+'，請先核對再產生候選單。';
 }
+function menuChoiceOptions(original){
+ const active=menu.filter(x=>x.active!==false);
+ const matched=catalogCandidates(original);
+ const recommended=new Set(matched.map(x=>x.id||x.name));
+ const option=x=>'<option value="'+esc(x.name)+'">'+esc(x.category)+'｜'+esc(x.name)+'（'+money(catalogPrice(x))+'）</option>';
+ const suggestions=matched.length?'<optgroup label="可能的品項">'+matched.map(option).join('')+'</optgroup>':'';
+ const remaining=active.filter(x=>!recommended.has(x.id||x.name));
+ const categories=[...new Set(remaining.map(x=>x.category))].sort((a,b)=>a.localeCompare(b,'zh-TW'));
+ return suggestions+categories.map(cat=>'<optgroup label="'+esc(cat)+'">'+remaining.filter(x=>x.category===cat).map(option).join('')+'</optgroup>').join('');
+}
 function newCandidate(data={}){return {check:false,customer:'',date:$('defaultDate').value,item:'',qty:1,price:'',total:'',notes:'',mode:'add',target:'',sourceIndex:0,line:0,...data}}
 function extractCandidates(){
 const raw=$('rawText').value;if(!raw.trim()){alert('請先辨識或貼上文字');return}
@@ -186,7 +196,7 @@ function drawCandidates(){
       '<div class="cols"><label>品名<input list="menuAutocomplete" autocomplete="off" data-i="'+i+'" data-k="item" value="'+esc(p.item)+'"></label><label>數量<input type="number" min="1" max="999" data-i="'+i+'" data-k="qty" value="'+p.qty+'"></label>'+
       '<label>單價<input type="number" min="0" step=".01" data-i="'+i+'" data-k="price" value="'+esc(p.price)+'"></label><div><label>品項小計（自動計算）</label><div class="auto-subtotal" data-i="'+i+'" data-subtotal="true">'+(candidateAmount(p)===null?'⚠️ 單價待確認':money(candidateAmount(p)))+'</div></div></div>'+
       '<p class="hint" style="margin:7px 0;color:'+(p.catalogStatus==='matched'?'#6c7751':'#b25b2d')+'">'+(p.catalogHint?'📋 '+esc(p.catalogHint):'')+'</p>'+ 
-      (p.catalogStatus==='ambiguous'?'<label>可能的正式商品<select data-i="'+i+'" data-k="chooseItem"><option value="">請選擇正確商品</option>'+catalogCandidates(p.item).map(m=>'<option value="'+esc(m.name)+'">'+esc(m.name)+'（'+money(catalogPrice(m))+'）</option>').join('')+'</select></label>':'')+
+      (p.catalogStatus==='ambiguous'||p.catalogStatus==='unknown'?'<label class="candidate-menu-confirm">⚠️ 未確認正式菜單品項（原文：'+esc(p.item)+'）<select data-i="'+i+'" data-k="chooseItem" required><option value="">請選擇對應的正式品項</option>'+menuChoiceOptions(p.item)+'</select></label>':'')+
       '<div class="row"><span class="hint">'+(p.total!==''?'🧾 此筆使用特別金額（覆蓋自動計算）':'✅ 數量 × 單價，自動計算')+'</span><span class="hint">'+(p.flag?'⚠️ '+esc(p.reason||'需核對'):'待審核')+'</span></div>'+ 
       '<details class="total-override" '+(p.total!==''?'open':'')+'><summary>特殊折扣／組合優惠：手動指定本品項總額</summary><label>特別總額（留空即自動計算）<input type="number" min="0" step=".01" data-i="'+i+'" data-k="total" value="'+esc(p.total)+'" placeholder="不需填寫，使用自動計算"></label><p class="hint">只有折扣、組合優惠或特殊情況才需要填寫；一般訂單保持空白。</p></details>'+
       '<label>處理方式<select data-i="'+i+'" data-k="mode"><option value="add" '+(p.mode==='add'?'selected':'')+'>新增</option><option value="edit" '+(p.mode==='edit'?'selected':'')+'>修改原訂單</option><option value="cancel" '+(p.mode==='cancel'?'selected':'')+'>取消原訂單</option></select></label>'+
@@ -234,7 +244,7 @@ function candidateIssues(p){
  const date=String(p.date||'').trim();
  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||Number.isNaN(new Date(date+'T12:00:00').getTime())||new Date(date+'T12:00:00').getFullYear()!==Number(date.slice(0,4))||new Date(date+'T12:00:00').getMonth()+1!==Number(date.slice(5,7))||new Date(date+'T12:00:00').getDate()!==Number(date.slice(8,10)))issues.push('缺少或無效的取餐日期');
  if(!String(p.item||'').trim())issues.push('缺少品項');
- if(p.catalogStatus==='ambiguous')issues.push('品名可能對應多款商品');
+ if(p.catalogStatus==='ambiguous'||p.catalogStatus==='unknown')issues.push('請先從菜單選擇正確商品（原始品名已保留）');
  if(!Number.isInteger(p.qty)||p.qty<1||p.qty>999)issues.push('數量無效');
  if(['edit','cancel'].includes(p.mode)&&!p.target)issues.push('修改／取消未選擇原訂單');
  return issues;
