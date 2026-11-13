@@ -27,13 +27,13 @@ body.login-mode>.wrap{max-width:530px;padding:clamp(12px,3vw,24px);margin:0 auto
 .print-card .customer-message{white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:370px){#loginCard.login-v2{padding:16px 15px}.login-duo{width:min(100%,240px)}.login-brand .wordmark{font-size:38px}}
 @media(prefers-reduced-motion:no-preference){.login-duo{animation:loginUp .45s ease-out both}@keyframes loginUp{from{transform:translateY(9px);opacity:.4}to{transform:translateY(0);opacity:1}}}
-</style><link rel="stylesheet" href="./cloud-theme.css?v=20261113-brand-manual2"></head><body class="login-mode">
-<header class="brand-app-header"><div class="row brand-header-row"><div class="brand-header-lockup"><img class="brand-header-logo" src="./assets/breakfast-official-logo.webp?v=20261113-verified2" alt="吃早餐 Breakfast & Dessert Studio 官方招牌" width="74" height="74"><div class="brand-header-copy"><strong>吃早餐｜雲端訂單</strong><small>Breakfast &amp; Dessert Studio</small></div></div><span id="who">尚未登入</span></div><div class="header-subline"><small>✨ A／B 雙管理者｜相同權限｜共同資料庫</small><img src="./assets/admin-duo-q.svg" alt="原有 A、B 管理者 IP 合照" width="74" height="74" loading="lazy"></div></header>
+</style><link rel="stylesheet" href="./cloud-theme.css?v=20261113-admin-hero3"></head><body class="login-mode">
+<header class="brand-app-header"><div class="row brand-header-row"><div class="brand-header-lockup"><img class="brand-header-logo" src="./assets/breakfast-official-logo.webp?v=20261113-verified2" alt="吃早餐 Breakfast & Dessert Studio 官方招牌" width="74" height="74"><div class="brand-header-copy"><strong>吃早餐｜雲端訂單</strong><small>Breakfast &amp; Dessert Studio</small></div></div><span id="who">尚未登入</span></div><div class="header-subline"><div class="brand-admin-ribbon"><span>🌟 兩位店長一起守護每筆訂單</span><strong>雙管理者｜相同權限｜共同資料庫</strong></div><div class="brand-admin-hero"><img src="./assets/admin-duo-q.svg" alt="管理者 A 女生與管理者 B 男生的原有 Q 版 IP" width="170" height="170" loading="eager"><div class="brand-admin-nameplates"><span>👩 管理者 A</span><span>👨 管理者 B</span></div></div></div></header>
 <div class="wrap">
 <div id="notConfigured" class="warning">⚙️ 雲端資料庫尚未完成設定。這個頁面已經具備登入與同步程式，但需要先建立 Supabase 專案、執行資料庫 SQL、加入兩位管理者，才會啟用正式訂單。<a href="./CLOUD_SETUP.md">查看設定說明</a></div>
 <div id="loginCard" class="card login-v2">
 <div class="login-brand"><img class="brand-official-logo" src="./assets/breakfast-official-logo.webp?v=20261113-verified2" alt="你提供的吃早餐 Breakfast & Dessert Studio 官方招牌圖片" width="280" height="280" decoding="async" loading="eager"><div class="subtitle">吃早餐｜雙管理者雲端訂單</div></div>
-<img class="login-duo" alt="A 管理者為女生、B 管理者為男生的 Q 版雙人插畫" src="./assets/admin-duo-q.svg" width="276" height="276" loading="eager" decoding="async">
+<div class="login-admin-hero"><div class="login-admin-sparkle" aria-hidden="true">✨ 🥯 💛</div><img class="login-duo" alt="A 管理者為女生、B 管理者為男生的原有 Q 版雙人插畫" src="./assets/admin-duo-q.svg" width="340" height="340" loading="eager" decoding="async"><div class="login-admin-labels"><span>👩 管理者 A</span><span>👨 管理者 B</span></div></div>
 <h2 class="login-title">✨ 雙管理者共同登入</h2>
 <p class="login-values">👩 管理者 A　×　👨 管理者 B<br>相同權限｜共同審核｜雲端同步</p>
 <form id="loginForm">
