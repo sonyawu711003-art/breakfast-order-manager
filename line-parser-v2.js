@@ -46,10 +46,10 @@ if(!hits.length){
  // Retain unrecognized product names when the customer explicitly provides an item AND a quantity.
  // This is a review-only fallback: never auto-pick a menu item or silently omit an order line.
  // Supports "1.起士三重奏*4", "起士三重奏×4", "藍莓乳酪 2顆" and OCR spacing variations.
- const bare=s.replace(/^(?:\\d{1,2}\\s*[.．、)）]\\s*)/,'').replace(/^(?:20\\d{2}[\\/.-])?\\d{1,2}\\s*[\\/月.-]\\s*\\d{1,2}\\s*(?:日)?\\s*(?:\\([^)]*\\))?\\s*/,'').trim();
- const explicit=bare.match(/^([^\\n，,;；:：]{2,80}?)\\s*(?:[×xX*+]\\s*(\\d{1,3})|(\\d{1,3})\\s*(?:顆|個|份|杯|盒|組))\\s*(?:[，,。.!！]\\s*)?$/);
+ const bare=s.replace(/^(?:\d{1,2}\s*[.．、)）]\s*)/,'').replace(/^(?:20\d{2}[\/.-])?\d{1,2}\s*[\/月.-]\s*\d{1,2}\s*(?:日)?\s*(?:\([^)]*\))?\s*/,'').trim();
+ const explicit=bare.match(/^([^\n，,;；:：]{2,80}?)\s*(?:[×xX*+]\s*(\d{1,3})|(\d{1,3})\s*(?:顆|個|份|杯|盒|組))\s*(?:[，,。.!！]\s*)?$/);
  if(!explicit)return [];
- const item=explicit[1].trim().replace(/^[+＋•\\-–]\\s*/,'');
+ const item=explicit[1].trim().replace(/^[+＋•\-–]\s*/,'');
  const quantity=Number(explicit[2]||explicit[3]);
  if(!item||quantity<1||quantity>999||/^(?:謝謝|收到|好的|已讀|共計|合計|總計|小計|售價|總額)/.test(item))return [];
  const day=ds.length===1?ds[0].date:ds.length>1?'':ctx.defaultDate||'';
