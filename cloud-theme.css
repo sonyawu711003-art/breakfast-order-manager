@@ -260,3 +260,28 @@ body:not(.login-mode) #dashboard #biDashboardWarning button{
 #printview .print-baseline-row span{line-height:1.45;overflow-wrap:anywhere}
 #printview #printBaselineSave{width:100%;margin-top:12px;background:#ba7137}
 @media print{#printview .print-baseline-panel{display:none!important}}
+
+/* Eating Breakfast official user-supplied brand: keep original mascots A and B. */
+#loginCard.login-v2 .brand-official-logo{
+ display:block;width:min(100%,280px);height:auto;aspect-ratio:1/1;object-fit:contain;
+ margin:0 auto 8px;border-radius:18px;
+ box-shadow:0 6px 22px rgba(159,100,42,.12);
+}
+#loginCard.login-v2 .login-brand{margin:-6px 0 8px}
+#loginCard.login-v2 .login-brand .subtitle{font-weight:850;color:#784321;margin:8px auto 7px}
+#loginCard.login-v2 .login-duo{width:min(100%,210px);max-height:190px;object-fit:contain;margin:8px auto 6px;border-radius:16px}
+.brand-app-header .brand-header-row{align-items:center;gap:10px}
+.brand-app-header .brand-header-lockup{display:flex;align-items:center;gap:11px;min-width:0}
+.brand-app-header .brand-header-logo{width:68px;height:68px;border-radius:13px;background:#fff8dc;object-fit:contain;flex:none;box-shadow:0 2px 10px #0002}
+.brand-app-header .brand-header-copy{min-width:0}
+.brand-app-header .brand-header-copy strong{display:block;font-size:clamp(16px,4vw,21px)}
+.brand-app-header .brand-header-copy small{display:block;color:#e8f3e9;font-size:11px}
+.brand-app-header #who{font-size:12px;overflow-wrap:anywhere;max-width:45%}
+.brand-app-header .header-subline{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.brand-app-header .header-subline img{width:65px;height:65px;object-fit:contain;background:#fff5da;border-radius:13px;padding:3px}
+#manage .manual-order-shortcut{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin:8px 0 16px;padding:13px 15px;background:#fff7e5;border:1.5px solid #edd4ac;border-radius:14px}
+#manage #manualOrderShortcut{background:linear-gradient(110deg,#f29939,#d56a21);color:white;font-weight:900;padding:13px 20px;border-radius:11px;box-shadow:0 3px 10px #b26b332b}
+#manage .manual-order-shortcut .hint{margin:0;line-height:1.6}
+#manage #legacySingleEditor{scroll-margin-top:24px}
+@media(min-width:580px){#manage .manual-order-shortcut{flex-direction:row;align-items:center;gap:16px}}
+@media print{.brand-app-header,.brand-official-logo,#manage .manual-order-shortcut{display:none!important}}
