@@ -285,3 +285,59 @@ body:not(.login-mode) #dashboard #biDashboardWarning button{
 #manage #legacySingleEditor{scroll-margin-top:24px}
 @media(min-width:580px){#manage .manual-order-shortcut{flex-direction:row;align-items:center;gap:16px}}
 @media print{.brand-app-header,.brand-official-logo,#manage .manual-order-shortcut{display:none!important}}
+
+/* 2026-11-13 cheerful breakfast brand hero, preserving ORIGINAL A/B manager drawing and official user image */
+body.login-mode{background:
+ radial-gradient(circle at 12% 16%,#fffbe6 0,transparent 34%),
+ radial-gradient(circle at 83% 27%,#ffe59d 0,transparent 35%),
+ linear-gradient(160deg,#fff1bb 0%,#ffe8c8 48%,#fff7e4 100%);}
+#loginCard.login-v2{background:rgba(255,254,248,.96);border:2px solid #fff;box-shadow:0 12px 33px #bc72253d;border-radius:30px;}
+#loginCard.login-v2 .brand-official-logo{width:min(100%,235px);box-shadow:none;border-radius:14px}
+#loginCard.login-v2 .login-admin-hero{
+ display:flex;flex-direction:column;align-items:center;position:relative;overflow:hidden;
+ background:radial-gradient(ellipse at 50% 20%,#fff9db 0%,#ffdb85 74%,#ffc55c 100%);
+ border:3px solid white;border-radius:28px;box-shadow:0 8px 24px #d88b3f3f;
+ padding:13px 12px 15px;margin:13px auto 17px;
+ max-width:430px;isolation:isolate;
+}
+#loginCard.login-v2 .login-admin-hero::before,
+#loginCard.login-v2 .login-admin-hero::after{content:'✦';position:absolute;color:#fff;font-size:44px;text-shadow:0 2px 9px #ffb73e;z-index:-1;}
+#loginCard.login-v2 .login-admin-hero::before{top:20%;left:5%}
+#loginCard.login-v2 .login-admin-hero::after{right:7%;bottom:21%}
+#loginCard.login-v2 .login-admin-sparkle{font-size:23px;letter-spacing:10px;line-height:1.3}
+#loginCard.login-v2 .login-duo{
+ width:min(100%,340px);height:auto;max-height:none;aspect-ratio:1;object-fit:contain;
+ margin:0 auto;background:transparent;border:0;border-radius:21px;box-shadow:none;
+}
+#loginCard.login-v2 .login-admin-labels{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:-4px}
+#loginCard.login-v2 .login-admin-labels span{font-size:13px;font-weight:900;border-radius:999px;padding:7px 14px;border:2px solid white;box-shadow:0 3px 12px #bf742e33;background:#ffe4e9;color:#94465a}
+#loginCard.login-v2 .login-admin-labels span+span{background:#dbf1ff;color:#246486}
+#loginCard.login-v2 .login-title{color:#73401c}
+#loginCard.login-v2 #signIn{background:linear-gradient(120deg,#ff9f28 0%,#ee7219 100%);border:2px solid #fff4e8;box-shadow:0 6px 20px #df8a2b55}
+.brand-app-header{background:linear-gradient(135deg,#fff4bf 0%,#ffe19b 53%,#ffc873 100%)!important;color:#743716!important;border-bottom:3px solid #e6ab53!important;box-shadow:0 5px 18px #a66c3126}
+.brand-app-header .brand-header-copy strong{color:#753c20;font-weight:900}
+.brand-app-header .brand-header-copy small{color:#975833}
+.brand-app-header #who{color:#7c4829;font-weight:700}
+.brand-app-header .brand-header-logo{width:83px;height:83px;background:#fff5d9;border:3px solid white;box-shadow:0 4px 12px #b7743940}
+.brand-app-header .header-subline{display:flex;align-items:center;justify-content:space-between;gap:7px;min-height:142px;margin-top:5px;background:radial-gradient(circle at 65% 15%,#fff9e8 0%,transparent 70%);border-radius:20px;padding:8px 12px}
+.brand-app-header .brand-admin-ribbon{display:flex;flex-direction:column;gap:8px;max-width:47%;color:#965423;line-height:1.55}
+.brand-app-header .brand-admin-ribbon span{font-size:12px;font-weight:750}
+.brand-app-header .brand-admin-ribbon strong{font-size:clamp(12px,3.7vw,17px);font-weight:900;color:#7a4221}
+.brand-app-header .brand-admin-hero{display:flex;flex-direction:column;align-items:center;flex:0 1 49%;min-width:0}
+.brand-app-header .brand-admin-hero img{display:block!important;width:min(100%,160px)!important;height:125px!important;object-fit:contain!important;padding:0!important;background:transparent!important;border-radius:16px!important;filter:drop-shadow(0 6px 8px #a96d3b44)}
+.brand-app-header .brand-admin-nameplates{display:flex;justify-content:center;gap:4px;flex-wrap:wrap}
+.brand-app-header .brand-admin-nameplates span{border:2px solid white;background:#ffdae5;border-radius:99px;padding:3px 6px;color:#8b3150;font-weight:850;font-size:10px;white-space:nowrap}
+.brand-app-header .brand-admin-nameplates span+span{background:#d9efff;color:#246083}
+@media(min-width:600px){
+ .brand-app-header .header-subline{min-height:175px}
+ .brand-app-header .brand-admin-hero img{width:200px!important;height:155px!important}
+ .brand-app-header .brand-admin-ribbon{max-width:55%}
+}
+@media(max-width:375px){
+ .brand-app-header .brand-header-logo{width:66px;height:66px}
+ .brand-app-header .header-subline{min-height:126px;padding:7px}
+ .brand-app-header .brand-admin-hero img{height:105px!important}
+ .brand-app-header .brand-admin-nameplates span{font-size:9px;padding:2px 4px}
+ #loginCard.login-v2 .login-admin-labels span{font-size:12px;padding:6px 9px}
+}
+@media print{.brand-app-header{display:none!important}}
