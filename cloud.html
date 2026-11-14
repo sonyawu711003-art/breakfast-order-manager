@@ -202,7 +202,7 @@ const historyOrders=allActive.filter(x=>x.pickup_date<cycle.sunday);
 const detailOrders=mode==='history'?historyOrders:currentOrders;
 const dates=[...new Set(detailOrders.map(x=>x.pickup_date))].sort();
 sel.innerHTML='<option value="all">全部'+(mode==='history'?'歷史':'本週')+'日期</option>'+dates.map(d=>'<option value="'+htmlEscape(d)+'">'+htmlEscape(d)+'</option>').join('');
-sel.value=dates.includes(previous)?previous:'all';
+sel.value=dates.includes(previous)?previous:(mode==='history'&&previous!=='all'&&dates.length?dates[dates.length-1]:'all');
 const visibleDates=sel.value==='all'?dates:[sel.value];
 const selectedDetails=detailOrders.filter(x=>sel.value==='all'||x.pickup_date===sel.value);
 const bagelName=bagelNameLookup(),bagels=[],other=[];
