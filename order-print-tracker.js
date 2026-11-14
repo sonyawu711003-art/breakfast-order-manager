@@ -19,7 +19,10 @@ function changedOn(row,date){
 }
 function groupedOrders(pickupDate){
  const groupMap=new Map();
+ const start=window.BreakfastWeekCycle.week().saturday;
  for(const row of orders){
+  // At Friday 23:59, exclude finished-week pickups while retaining upcoming weeks.
+  if(row.pickup_date<start)continue;
   if(pickupDate!=='all'&&row.pickup_date!==pickupDate)continue;
   const key=row.pickup_date+'\u001f'+row.customer;
   if(!groupMap.has(key))groupMap.set(key,{pickupDate:row.pickup_date,customer:row.customer,all:[],active:[]});
@@ -44,7 +47,7 @@ function mount(){
   '</select></label>',
   '<label class="pdf-print-filter" id="pdfChangeDateLabel">資料新增／修改日期（台灣時間）',
   '<input id="pdfChangeDate" type="date"></label>',
-  '<p id="pdfExportHelp" class="hint">依訂單實際新增／修改時間篩選，不以 PDF 儲存時間計算。</p>'
+  '<p id="pdfExportHelp" class="hint">依訂單實際新增／修改時間篩選；週五 23:59 會隱藏當週取餐的訂單卡，但保留下一週及更遠期的預訂。</p>'
  ].join(''));
  byId('pdfChangeDate').value=taipeiDay(new Date());
  byId('pdfExportMode').addEventListener('change',()=>drawPrintCards());
@@ -56,7 +59,8 @@ drawPrintCards=function(){
  const dateSelect=byId('printDateFilter');
  if(!dateSelect)return;
  const prior=dateSelect.value;
- const available=[...new Set(orders.filter(row=>row.status==='active').map(row=>row.pickup_date))].sort();
+ const start=window.BreakfastWeekCycle.week().saturday;
+ const available=[...new Set(orders.filter(row=>row.status==='active'&&row.pickup_date>=start).map(row=>row.pickup_date))].sort();
  dateSelect.innerHTML='<option value="all">全部取餐日期</option>'+
   available.map(date=>'<option value="'+esc(date)+'">'+esc(date)+'</option>').join('');
  dateSelect.value=available.includes(prior)?prior:'all';
@@ -82,5 +86,12 @@ printSelectedOrderCards=function(){
  window.print();
 };
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
+// A page left open across the Friday closing minute must also clear its preview.
+let lastCutover=window.BreakfastWeekCycle.week().saturday;
+setInterval(()=>{if(document.visibilityState==='visible'&&typeof session!=='undefined'&&session){
+ const now=window.BreakfastWeekCycle.week().saturday;
+ if(lastCutover!==now){lastCutover=now;drawPrintCards()}
+}},10000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&typeof session!=='undefined'&&session)drawPrintCards()});
 window.BreakfastOrderPdfChanges={taipeiDay,changedOn,groupedOrders,computeCards};
 })();
