@@ -3,14 +3,21 @@
 'use strict';
 const $i=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let week='',stock=[],ledger=[],catalog=[],liveBagelMenu=null,dirty=false,busy=false,fetching=false,pendingId=null,readSeq=0,loadedWeek='',reloadQueued=false;
+let week='',stock=[],ledger=[],catalog=[],liveBagelMenu=null,dirty=false,busy=false,fetching=false,pendingId=null,readSeq=0,loadedWeek='',reloadQueued=false,manualWeek=false;
 function tpeToday(date=new Date()){
  const p=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date).filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
  return p.year+'-'+p.month+'-'+p.day;
 }
 function plusDays(s,n){const [y,m,d]=s.split('-').map(Number);return new Date(Date.UTC(y,m-1,d+n)).toISOString().slice(0,10)}
-function sunday(s){const [y,m,d]=s.split('-').map(Number);return plusDays(s,-new Date(Date.UTC(y,m-1,d)).getUTCDay())}
-function endOfWeek(){return plusDays(week,6)}
+function sunday(s){const [y,m,d]=s.split('-').map(Number);const dow=new Date(Date.UTC(y,m-1,d)).getUTCDay();return plusDays(s,dow===6?1:-dow)}
+function endOfWeek(){return plusDays(week,5)}
+function activeStockWeek(){return window.BreakfastWeekCycle.week().sunday}
+function isNewWeekBridge(){return window.BreakfastWeekCycle.week().bridge&&week===activeStockWeek()}
+function rolloverIfNeeded(){
+ const next=activeStockWeek();
+ if(!manualWeek&&!dirty&&week!==next){week=next;$i('biWeek').value=week;stock=[];ledger=[];loadedWeek='';return true}
+ return false;
+}
 function bagelName(item){
  try{return bagelNameLookup()(item)||null}catch(e){return null}
 }
@@ -83,7 +90,7 @@ function mount(){
  const main=$i('main'),nav=$i('nav');if(!main||!nav||$i('bagelInventory'))return;
  main.insertAdjacentHTML('beforeend',[
  '<section id="bagelInventory" class="screen hidden"><h2>🥯 每週貝果庫存控管</h2>',
- '<p class="hint">每週日輸入各口味期初庫存。正式訂單按取餐日自動預留；現場零售另行登記。少於 3 顆即紅字警示。</p>',
+ '<p class="hint">週日輸入期初庫存，週五台灣時間 23:59 自動結算；週六新週先歸零，週日再次輸入期初。舊週資料保留紀錄。少於 3 顆顯示紅字警示。</p>',
  '<div class="card"><label>庫存週次（選任何日期，自動換算週日）<input id="biWeek" type="date"></label>',
  '<div class="row"><b id="biRange"></b><button type="button" class="secondary" id="biRefresh">更新庫存</button></div>',
  '<p id="biStatus" class="hint" role="status"></p></div>',
@@ -106,10 +113,10 @@ function mount(){
  ].join(''));
  nav.insertAdjacentHTML('beforeend','<button onclick="tab(\'bagelInventory\')">庫存</button>');
  if($i('dashboard')){const stats=$i('dashboard');const anchor=$i('cards');if(anchor)anchor.insertAdjacentHTML('afterend','<div id="biDashboardWarning" class="hidden" role="alert" aria-live="polite"></div>');else stats.insertAdjacentHTML('afterbegin','<div id="biDashboardWarning" class="hidden" role="alert" aria-live="polite"></div>');}
- week=sunday(tpeToday());$i('biWeek').value=week;
+ week=activeStockWeek();$i('biWeek').value=week;
  $i('biWeek').addEventListener('change',()=>{
   if(dirty&&!confirm('期初庫存有未儲存的修改，確定切換週次？')){$i('biWeek').value=week;return}
-  if(!$i('biWeek').value)return;week=sunday($i('biWeek').value);$i('biWeek').value=week;dirty=false;load();
+  if(!$i('biWeek').value)return;week=sunday($i('biWeek').value);manualWeek=week!==activeStockWeek();$i('biWeek').value=week;dirty=false;loadedWeek='';load();
  });
  $i('biRefresh').addEventListener('click',()=>{if(dirty&&!confirm('放棄未儲存的期初庫存並重新整理？'))return;dirty=false;load()});
  $i('biOpeningForm').addEventListener('input',()=>dirty=true);
@@ -122,15 +129,19 @@ function mount(){
 function show(){
  if(!$i('bagelInventory')||!week)return;
  const {rows,unknown,legacy,ambiguous}=model(),low=rows.filter(x=>x.low);
+ const bridging=isNewWeekBridge();
  $i('biMenuSource').textContent=liveBagelMenu===null?'⚠️ 尚未取得正式雲端菜單，請按「更新庫存」重試。':'✅ 完全依據雲端「菜單及價格管理」之啟用貝果：'+rows.length+' 款。品項變更請先到菜單修改。';
  $i('biSaveOpening').disabled=busy||liveBagelMenu===null;
  $i('biSaveEvent').disabled=busy||liveBagelMenu===null;
- $i('biRange').textContent=week+' ～ '+endOfWeek();
+ $i('biRange').textContent=week+' ～ '+endOfWeek()+(bridging?'｜上週五 23:59 已結算，新週待週日輸入期初':'');
  const date=$i('biDate'),today=tpeToday();
+ // Saturday / Friday closing minute is not a sale day for the new Sunday inventory.
+ $i('biSaveEvent').disabled=busy||liveBagelMenu===null||bridging;
+ $i('biSaveOpening').disabled=busy||liveBagelMenu===null||bridging;
  date.min=week;date.max=endOfWeek();
  if(!date.value||date.value<week||date.value>endOfWeek())date.value=today>=week&&today<=endOfWeek()?today:week;
  $i('biOpenRows').innerHTML=rows.map(x=>'<label class="bi-open-row"><span>'+esc(x.name)+'</span><input type="number" inputmode="numeric" min="0" max="99999" data-bi-name="'+esc(x.name)+'" placeholder="未設定" value="'+(x.opening??'')+'"></label>').join('');
- $i('biBalances').innerHTML=rows.map(x=>'<tr'+(x.low?' class="bi-low"':'')+'><td>'+esc(x.name)+'</td><td>'+(x.opening??'—')+'</td><td>'+x.reserved+'</td><td>'+x.retail+'</td><td>'+(x.restock+x.correction)+'</td><td class="'+(x.low?'bi-low-number':'')+'">'+(x.remaining===null?'未設定':x.remaining+' 顆')+(x.low?' ⚠️':'')+'</td></tr>').join('');
+ $i('biBalances').innerHTML=(bridging?rows.map(x=>({...x,opening:0,reserved:0,retail:0,restock:0,correction:0,remaining:0,low:false})):rows).map(x=>'<tr'+(x.low?' class="bi-low"':'')+'><td>'+esc(x.name)+'</td><td>'+(x.opening??'—')+'</td><td>'+x.reserved+'</td><td>'+x.retail+'</td><td>'+(x.restock+x.correction)+'</td><td class="'+(x.low?'bi-low-number':'')+'">'+(x.remaining===null?'未設定':x.remaining+' 顆')+(x.low?' ⚠️':'')+'</td></tr>').join('');
  $i('biWarning').innerHTML=low.length?'<div class="bi-alert"><b>⚠️ 庫存低於 3 顆（'+low.length+' 款）</b><div>'+low.map(x=>'<div>'+esc(x.name)+'：'+x.remaining+' 顆</div>').join('')+'</div></div>':'';
  $i('biUnknown').textContent=(rows.filter(x=>x.opening===null).length+' 個菜單貝果尚未設定期初數量。')+
  (ambiguous.length?' ⚠️ 同一貝果有不同名稱的期初紀錄，暫不合計，請核對後再輸入正確期初：'+ambiguous.join('；'):'')+
@@ -145,7 +156,7 @@ function show(){
  // 負數優先置頂，讓管理者第一眼看見可能超收的品項。
  const dashboardLow=low.filter(x=>x.remaining<0||(x.remaining>0&&x.remaining<3)).sort((a,b)=>
   (a.remaining<0?0:1)-(b.remaining<0?0:1)||a.remaining-b.remaining||a.name.localeCompare(b.name,'zh-TW'));
- if(dash){if(week===sunday(tpeToday())&&loadedWeek===week&&dashboardLow.length){
+ if(dash){if(!bridging&&week===activeStockWeek()&&loadedWeek===week&&dashboardLow.length){
  dash.classList.remove('hidden');
  const first=dashboardLow.slice(0,3),extra=dashboardLow.slice(3);
  dash.innerHTML='<b>⚠️ 貝果庫存警示 '+dashboardLow.length+' 款（負數／剩餘 1～2 顆）</b><div class="bi-dashboard-low-list">'+first.map(x=>'<div>'+esc(x.name)+'：'+x.remaining+' 顆'+(x.remaining<0?' ⚠️ 超收／庫存不足':'')+'</div>').join('')+'</div>'+
@@ -211,13 +222,13 @@ const oldDraw=draw;
 draw=function(){
  oldDraw();
  if(!session||!$i('bagelInventory'))return;
- const current=sunday(tpeToday()),screenVisible=!$i('bagelInventory').classList.contains('hidden');
- // Default to a fresh Sunday week without taking the user away from deliberate history browsing.
- if(!screenVisible&&!dirty&&week!==current){week=current;$i('biWeek').value=week;loadedWeek='';}
+ rolloverIfNeeded();
  if(!dirty&&loadedWeek!==week&&!fetching)load();
  else if(!dirty)show();
 };
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
-setInterval(()=>{if(session&&document.visibilityState==='visible'&&!dirty&&week===sunday(tpeToday()))load()},90000);
+setInterval(()=>{if(session&&document.visibilityState==='visible'&&!dirty){const rolled=rolloverIfNeeded();if(rolled||loadedWeek!==week)load();else show()}},10000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&session&&!dirty){rolloverIfNeeded();load()}});
+
 window.BreakfastBagelInventory={tpeToday,sunday,plusDays,model,load};
 })();
