@@ -45,12 +45,9 @@ function canonicalBagel(name,names){
 }
 function model(){
  const names=menuBagels(),booked=new Map(),unknown=[];
- // Friday 23:59 / Saturday: new cycle is not open until Sunday.
- // Reset the model itself (including reserved orders), not merely the table's display.
- if(isNewWeekBridge())return {rows:names.map(name=>({
-  name,opening:0,reserved:0,retail:0,restock:0,correction:0,
-  remaining:0,low:false,ambiguous:false
- })),unknown:[],legacy:[],ambiguous:[]};
+ // At Friday 23:59 the previous week's inventory is closed, but next week's
+ // confirmed pickup orders must be reserved immediately, even before Sunday opening stock.
+ // Do NOT return a zeroed model: it would conceal already-booked orders.
  for(const x of orders){
   if(x.status!=='active'||x.pickup_date<week||x.pickup_date>endOfWeek())continue;
   const name=canonicalBagel(x.item,names);
@@ -86,9 +83,13 @@ function model(){
     '；其他紀錄 '+sources.filter(x=>x!==source).map(x=>x.item_name+' '+x.opening_qty+' 顆').join('／'));
   }
   const m=movement.get(name)||{retail:0,restock:0,correction:0};
-  const opening=source?Number(source.opening_qty):null,reserved=booked.get(name)||0;
-  const remaining=opening===null?null:opening+m.restock+m.correction-reserved-m.retail;
-  return {name,opening,reserved,...m,remaining,low:remaining!==null&&remaining<3,ambiguous:sources.length>1};
+  const realOpening=source?Number(source.opening_qty):null,reserved=booked.get(name)||0;
+  const bridge=isNewWeekBridge();
+  // Display the fresh stock cycle as zero before Sunday, but do not represent
+  // its unknown availability as zero stock; reservations are independent.
+  const opening=bridge&&realOpening===null?0:realOpening;
+  const remaining=realOpening===null?null:realOpening+m.restock+m.correction-reserved-m.retail;
+  return {name,opening,reserved,...m,remaining,low:!bridge&&remaining!==null&&remaining<3,ambiguous:sources.length>1};
  });
  return {rows,unknown:[...new Set(unknown)],legacy,ambiguous};
 }
@@ -147,7 +148,7 @@ function show(){
  $i('biSaveEvent').disabled=busy||liveBagelMenu===null;
  const historicalWeek=week!==activeStockWeek();
  $i('biRange').textContent=week+' ～ '+endOfWeek()+
-  (historicalWeek?'｜📚 歷史週次（不代表本週）':bridging?'｜✅ 上週已結算；庫存、訂單預留與零售量已歸零，週日重新建檔':'｜本週');
+  (historicalWeek?'｜📚 歷史週次（不代表本週）':bridging?'｜✅ 上週庫存已結算；新週訂單預留立即累計，週日輸入期初庫存':'｜本週');
  $i('biCurrentWeek').classList.toggle('hidden',!historicalWeek);
  const date=$i('biDate'),today=tpeToday();
  // Saturday / Friday closing minute is not a sale day for the new Sunday inventory.
@@ -158,7 +159,7 @@ function show(){
  $i('biOpenRows').innerHTML=rows.map(x=>'<label class="bi-open-row"><span>'+esc(x.name)+'</span><input type="number" inputmode="numeric" min="0" max="99999" data-bi-name="'+esc(x.name)+'" placeholder="未設定" value="'+(x.opening??'')+'"></label>').join('');
  $i('biBalances').innerHTML=rows.map(x=>'<tr'+(x.low?' class="bi-low"':'')+'><td>'+esc(x.name)+'</td><td>'+(x.opening??'—')+'</td><td>'+x.reserved+'</td><td>'+x.retail+'</td><td>'+(x.restock+x.correction)+'</td><td class="'+(x.low?'bi-low-number':'')+'">'+(x.remaining===null?'未設定':x.remaining+' 顆')+(x.low?' ⚠️':'')+'</td></tr>').join('');
  $i('biWarning').innerHTML=low.length?'<div class="bi-alert"><b>⚠️ 庫存低於 3 顆（'+low.length+' 款）</b><div>'+low.map(x=>'<div>'+esc(x.name)+'：'+x.remaining+' 顆</div>').join('')+'</div></div>':'';
- $i('biUnknown').textContent=(rows.filter(x=>x.opening===null).length+' 個菜單貝果尚未設定期初數量。')+
+ $i('biUnknown').textContent=(bridging?'新週尚未建期初庫存；已成立的下週訂單數仍正常顯示，剩餘庫存待建檔。':rows.filter(x=>x.opening===null).length+' 個菜單貝果尚未設定期初數量。')+
  (ambiguous.length?' ⚠️ 同一貝果有不同名稱的期初紀錄，暫不合計，請核對後再輸入正確期初：'+ambiguous.join('；'):'')+
  (legacy.length?' ⚠️ 菜單外的舊庫存資料已隱藏，但未刪除：'+legacy.join('；'):'')+
  (unknown.length?' ⚠️ 無法對應菜單的正式訂單，請檢查：'+unknown.join('、'):'');
