@@ -1,5 +1,5 @@
 /* Operational week: Sunday-to-Friday; close at Friday 23:59 Asia/Taipei.
-   Saturday is a fresh/empty bridge period. Retain history in Supabase. */
+   At closing, show next week's already-booked orders in statistics. Retain history. */
 (function(){
 'use strict';
 function taipeiParts(date=new Date()){
@@ -27,8 +27,7 @@ function week(now=new Date()){
 }
 function currentStatsOrders(rows,now=new Date()){
  const w=week(now);
- // New week has not opened on Saturday / Friday's 23:59 closing minute.
- if(w.bridge)return [];
+ // Friday 23:59 starts the next reporting window immediately; booked future pickups must be visible even on Saturday.
  return rows.filter(x=>x.pickup_date>=w.sunday&&x.pickup_date<=w.friday);
 }
 function currentCardOrders(rows,now=new Date()){
