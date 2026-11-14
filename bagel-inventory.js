@@ -128,8 +128,8 @@ function mount(){
 }
 function show(){
  if(!$i('bagelInventory')||!week)return;
- const {rows,unknown,legacy,ambiguous}=model(),low=rows.filter(x=>x.low);
- const bridging=isNewWeekBridge();
+ const {rows,unknown,legacy,ambiguous}=model();
+ const bridging=isNewWeekBridge(),low=bridging?[]:rows.filter(x=>x.low);
  $i('biMenuSource').textContent=liveBagelMenu===null?'⚠️ 尚未取得正式雲端菜單，請按「更新庫存」重試。':'✅ 完全依據雲端「菜單及價格管理」之啟用貝果：'+rows.length+' 款。品項變更請先到菜單修改。';
  $i('biSaveOpening').disabled=busy||liveBagelMenu===null;
  $i('biSaveEvent').disabled=busy||liveBagelMenu===null;
