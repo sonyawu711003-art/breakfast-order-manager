@@ -45,7 +45,7 @@ body.login-mode>.wrap{max-width:530px;padding:clamp(12px,3vw,24px);margin:0 auto
 <p class="privacy-note">🔒 兩位管理者使用自己的帳號登入，共用同一份雲端資料</p></div>
 <div id="passwordCard" class="card hidden"><h2>🔑 完成帳號啟用／設定新密碼</h2><p class="hint">從 Supabase 邀請信或密碼重設信進入時，請為自己的管理者帳號設定密碼（至少 12 個字元）。</p><form id="newPasswordForm"><label>新密碼<input id="newPassword" type="password" autocomplete="new-password" minlength="12" required></label><label>再次輸入新密碼<input id="confirmPassword" type="password" autocomplete="new-password" minlength="12" required></label><button type="submit">設定新密碼</button></form><p id="passwordMsg" class="status"></p></div><div id="main" class="hidden">
 <div class="card row"><b id="syncStatus">正在連接雲端…</b><div><button class="secondary" onclick="reload()">同步資料</button> <button class="secondary" onclick="signOut()">登出</button></div></div>
-<div id="dashboard" class="screen"><h2>📊 製作統計</h2><p class="hint">本週統計依台灣時間週日～週五，週五 23:59 自動結算歸零；已結算資料仍可於歷史紀錄查詢。</p><label>取餐日期<select id="dateFilter" onchange="draw()"></select></label><div class="counts" id="cards"></div><h3>每日品項統計</h3><div id="mealStats" aria-live="polite"></div></div>
+<div id="dashboard" class="screen"><h2>📊 製作統計</h2><p class="hint">上方累計只計算目前營運週；每週五 23:59 自動歸零。歷史每日統計與客人喜好資料仍可查詢。</p><div id="statsWeekStatus" class="hint" aria-live="polite"></div><label>每日統計範圍<select id="statsView" onchange="draw()"><option value="current">本週每日統計</option><option value="history">歷史每日統計（不影響本週歸零）</option></select></label><label>取餐日期<select id="dateFilter" onchange="draw()"></select></label><div class="counts" id="cards"></div><h3>每日品項統計</h3><div id="mealStats" aria-live="polite"></div></div>
 <div id="manage" class="screen hidden"><h2>📝 共同訂單</h2><div class="manual-order-shortcut"><button type="button" id="manualOrderShortcut" onclick="startManualOrder()">＋ 手動新增訂單</button><span class="hint">快速新增客人、取餐日期、餐點、數量及特殊要求；儲存後同步雲端</span></div><input id="search" placeholder="搜尋客人或品項" oninput="draw()"><div id="orderList"></div><div class="card"><div class="row"><h3 id="formTitle">新增訂單</h3><button type="button" id="addOrderItem" class="secondary hidden" onclick="addItemToOrder()">＋ 加入這張訂單</button></div><p id="orderGroupInfo" class="hint hidden"></p><form id="orderForm"><input id="editId" type="hidden"><input id="editVersion" type="hidden"><label>客人名稱<input id="customer" required maxlength="100"></label><label>取餐日期<input id="pickup" type="date" required></label><label>品項<input id="item" required maxlength="200"></label><div class="grid"><label>數量<input id="qty" type="number" min="1" max="999" value="1" required></label><label>單價（可空白）<input id="price" type="number" min="0" step=".01"></label></div><label>客製備註<textarea id="notes" rows="3"></textarea></label><button type="submit" id="saveOrder">確認儲存至雲端</button> <button type="button" class="secondary" onclick="clearForm()">清除</button></form></div></div>
 <div id="printview" class="screen hidden"><h2>📄 訂單卡 PDF 匯出</h2><p class="hint no-print">每週五 23:59 自動隱藏本週取餐日的訂單卡，保留未來取餐訂單；舊週訂單不刪除，可於紀錄查詢。</p><div class="no-print"><label>選擇取餐日期<select id="printDateFilter" onchange="drawPrintCards()"><option value="all">全部日期</option></select></label><p id="printDateSummary" class="hint" aria-live="polite">請選擇要匯出的取餐日期。</p><button id="printOrderCards" onclick="printSelectedOrderCards()" disabled>匯出 A4 訂單卡 PDF</button><p class="hint">只匯出所選日期的有效訂單；6 公分寬、10pt 粗體，一位客人每天一張。</p><p id="printEmpty" class="hint">目前沒有可匯出的有效訂單。</p></div><div id="printCards"></div></div>
 <div id="history" class="screen hidden"><h2>🕘 操作紀錄與備份</h2><button onclick="loadAudit()">載入最新異動</button> <button class="secondary" onclick="downloadCsv()">匯出目前訂單 CSV</button><div id="auditList" class="card"></div><p class="hint">所有更新都由伺服器留下操作者與時間。取消訂單採保留紀錄方式，不會直接刪除。</p></div>
@@ -189,17 +189,31 @@ function drawMealStats(dates,groups){
   (daily||'<p class="hint">目前沒有有效訂單</p>');
 }
 function draw(){
-const allActive=orders.filter(x=>x.status==='active');const active=window.BreakfastWeekCycle.currentStatsOrders(allActive),sel=$('dateFilter'),v=sel.value;const dates=[...new Set(active.map(x=>x.pickup_date))].sort();sel.innerHTML='<option value="all">全部日期</option>'+dates.map(d=>'<option value="'+d+'">'+d+'</option>').join('');sel.value=dates.includes(v)?v:'all';
-const visibleDates=sel.value==='all'?dates:[sel.value];
-const scoped=active.filter(x=>sel.value==='all'||x.pickup_date===sel.value);
-const bagelName=bagelNameLookup(),bagels=[],other=[];
-for(const order of active){
- const item=bagelName(order.item);
- if(item)bagels.push({...order,item});
- else other.push(order);
+const allActive=orders.filter(x=>x.status==='active');
+const cycle=window.BreakfastWeekCycle.week();
+const currentOrders=window.BreakfastWeekCycle.currentStatsOrders(allActive);
+const statsView=$('statsView'),previousView=statsView.value;
+if(!window.__breakfastStatsModeInitialized){
+ statsView.value=cycle.bridge?'history':'current';
+ window.__breakfastStatsModeInitialized=true;
 }
-const visibleQuantity=items=>sumQuantity(sel.value==='all'?items:items.filter(x=>x.pickup_date===sel.value));
-$('cards').innerHTML=[['貝果',visibleQuantity(bagels)],['其他餐點',visibleQuantity(other)],['訂單筆數',scoped.length],['客人數',new Set(scoped.map(x=>x.customer)).size]].map(x=>'<div class="card"><div class="hint">'+x[0]+'</div><h2>'+x[1]+'</h2></div>').join('');
+const mode=statsView.value,sel=$('dateFilter'),previous=sel.value;
+const historyOrders=allActive.filter(x=>x.pickup_date<cycle.sunday);
+const detailOrders=mode==='history'?historyOrders:currentOrders;
+const dates=[...new Set(detailOrders.map(x=>x.pickup_date))].sort();
+sel.innerHTML='<option value="all">全部'+(mode==='history'?'歷史':'本週')+'日期</option>'+dates.map(d=>'<option value="'+htmlEscape(d)+'">'+htmlEscape(d)+'</option>').join('');
+sel.value=dates.includes(previous)?previous:'all';
+const visibleDates=sel.value==='all'?dates:[sel.value];
+const selectedDetails=detailOrders.filter(x=>sel.value==='all'||x.pickup_date===sel.value);
+const bagelName=bagelNameLookup(),bagels=[],other=[];
+for(const order of detailOrders){const item=bagelName(order.item);if(item)bagels.push({...order,item});else other.push(order)}
+const weekBagels=currentOrders.filter(x=>bagelName(x.item));
+const weekOther=currentOrders.filter(x=>!bagelName(x.item));
+$('cards').innerHTML=[['本週貝果',sumQuantity(weekBagels)],['本週其他餐點',sumQuantity(weekOther)],['本週訂單筆數',currentOrders.length],['本週客人數',new Set(currentOrders.map(x=>x.customer)).size]]
+ .map(x=>'<div class="card"><div class="hint">'+x[0]+'</div><h2>'+x[1]+'</h2></div>').join('');
+$('statsWeekStatus').textContent='本週統計：'+cycle.sunday+' ～ '+cycle.friday+
+ (cycle.bridge?'｜✅ 上週已結算，本週累計 0；下方可查歷史每日明細':'｜本週累計會在週五 23:59 歸零')+
+ (mode==='history'?'｜📚 目前顯示歷史明細（與本週累計分開）':'');
 drawMealStats(visibleDates,[{label:'貝果',unit:'顆',orders:bagels},{label:'其他餐點',unit:'份',orders:other}]);
 const q=$('search').value.trim().toLowerCase();
 $('orderList').innerHTML=orders.filter(x=>[x.customer,x.item,x.notes,x.pickup_date].join(' ').toLowerCase().includes(q)).map(x=>'<div class="order"><div class="row"><b>'+htmlEscape(x.customer)+'</b><span>'+x.pickup_date+'</span></div><div>'+htmlEscape(x.item)+' ×'+x.quantity+'｜'+(x.total_override!=null?'$'+x.total_override+'（手動）':x.price!=null?'$'+(x.price*x.quantity):'未定價')+(x.status==='cancelled'?'（已取消）':'')+'</div><div class="note">'+htmlEscape(x.notes)+'</div><div class="row"><span class="hint">版本 '+x.version+'</span><div><button class="secondary" onclick="editOrder(\''+x.id+'\')">修改</button> <button class="secondary" onclick="cancelOrder(\''+x.id+'\')" '+(x.status==='cancelled'?'disabled':'')+'>取消</button></div></div></div>').join('')||'<p class="hint">沒有訂單</p>';
