@@ -34,8 +34,12 @@ function archivedDate(date,now=taipeiClock()){
 function visibleCurrentOrder(row,now=taipeiClock()){
  return !archivedDate(row.pickup_date,now);
 }
+function searchKey(value){
+ return String(value??'').normalize('NFKC').toLocaleLowerCase('zh-TW').replace(/[\s\u200b-\u200d\ufeff]/g,'');
+}
 function matchesSearch(group,search){
- return !search||group.some(x=>[x.customer,x.pickup_date,x.item,x.notes].join(' ').toLowerCase().includes(search));
+ const needle=searchKey(search);
+ return !needle||group.some(x=>searchKey([x.customer,x.pickup_date,x.item,x.notes].join(' ')).includes(needle));
 }
 function historyCard(group){
  const live=group.filter(x=>x.status==='active'),first=group[0];
@@ -62,13 +66,30 @@ function drawHistoryOrders(now=taipeiClock()){
 }
 function drawGrouped(){
  const now=taipeiClock();
- const search=el('search')?.value.trim().toLowerCase()||'';
+ const search=el('search')?.value.trim()||'';
  const recent=orders.filter(x=>visibleCurrentOrder(x,now));
- const result=grouped(recent).filter(g=>matchesSearch(g,search));
- el('orderList').innerHTML=result.map(card).join('')||'<div class="card hint">目前沒有待處理的客人訂單。</div>';
  const older=orders.filter(x=>archivedDate(x.pickup_date,now));
- el('orderActiveSummary').textContent='待處理 '+result.length+' 張訂單｜台灣時間每日 11:00 自動將當日訂單移至「紀錄」，資料不刪除。';
- el('orderArchivedHint').textContent=older.length?'另有 '+grouped(older).length+' 張歷史訂單可在「紀錄」查詢。':'';
+ if(search){
+  const allMatches=grouped(orders).filter(g=>matchesSearch(g,search));
+  const currentMatches=[],historyMatches=[];
+  for(const g of allMatches){
+   if(archivedDate(g[0].pickup_date,now))historyMatches.push(g);
+   else currentMatches.push(g);
+  }
+  const currentHtml=currentMatches.map(card).join('');
+  const historyHtml=historyMatches.reverse().map(historyCard).join('');
+  el('orderList').innerHTML=
+   (currentMatches.length?'<h3>📋 待處理訂單（'+currentMatches.length+' 張）</h3>'+currentHtml:'')+
+   (historyMatches.length?'<h3>📚 歷史訂單（'+historyMatches.length+' 張）</h3><p class="hint">歷史訂單可展開查看品項及備註，不會因每週結算消失。</p>'+historyHtml:'')+
+   (!allMatches.length?'<div class="card hint">找不到符合「'+esc(search)+'」的客人或訂單；請試用姓名、部分品名或取餐日期。</div>':'');
+  el('orderActiveSummary').textContent='搜尋「'+search+'」：共 '+allMatches.length+' 張（待處理 '+currentMatches.length+' 張／歷史 '+historyMatches.length+' 張），搜尋範圍包含所有取餐日期。';
+  el('orderArchivedHint').textContent='清空搜尋文字即可恢復一般的待處理訂單列表。';
+ }else{
+  const result=grouped(recent);
+  el('orderList').innerHTML=result.map(card).join('')||'<div class="card hint">目前沒有待處理的客人訂單。</div>';
+  el('orderActiveSummary').textContent='待處理 '+result.length+' 張訂單｜台灣時間每日 11:00 自動將當日訂單移至「紀錄」，資料不刪除。';
+  el('orderArchivedHint').textContent=older.length?'另有 '+grouped(older).length+' 張歷史訂單可在「紀錄」查詢。':'';
+ }
  drawHistoryOrders(now);
 }
 function sourceLines(group){return group.filter(x=>x.status==='active').map(x=>({id:x.id,version:x.version,item:x.item,quantity:x.quantity,price:x.price,total_override:x.total_override,notes:x.notes,remove:false}))}
