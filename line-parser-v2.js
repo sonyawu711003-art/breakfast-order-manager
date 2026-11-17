@@ -20,7 +20,40 @@ function canon(s){return normal(s).replace(/(?:蔓越梅|蔓越苺|曼越梅|曼
 function dates(s,year){const out=[];for(const m of String(s).matchAll(dateRE)){const y=(m[0].match(/20\d{2}/)||[])[0]||String(year);const month=+m[1],day=+m[2];const d=new Date(+y,month-1,day);if(month<1||month>12||day<1||d.getMonth()!==month-1)continue;out.push({start:m.index,end:m.index+m[0].length,date:y+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0')})}return out}
 function itemMatches(s,extra){const names=[...new Set([...catalog,...(extra||[])])].filter(Boolean).sort((a,b)=>b.length-a.length);const hits=[];for(let i=0;i<s.length;i++){const name=names.find(n=>s.startsWith(n,i));if(!name)continue;hits.push({item:name,start:i,end:i+name.length});i+=name.length-1}return hits}
 function qtyAfter(fragment){const m=fragment.match(/^\s*(?:[×xX*+]\s*(\d{1,2})|(\d{1,2})\s*(?:個|顆|份|杯|組)?(?=\s*(?:[，,、+]|$|謝謝|不加|不要|加蛋|加厚蛋)))/);return m?Number(m[1]||m[2]):1}
+function dateRangeEach(s,ctx){
+ // A contiguous date range followed by one product and "each day" quantity.
+ // Examples: 11/18~11/20生菜沙拉各一, 11/18-20沙拉每天1份.
+ const match=s.match(/(?:(20\d{2})\s*[\/.年-])?(\d{1,2})\s*[\/.月-]\s*(\d{1,2})\s*(?:日)?\s*(?:[-~～至到]|(?:\s+到\s+))\s*(?:(20\d{2})\s*[\/.年-])?(?:(\d{1,2})\s*[\/.月-]\s*)?(\d{1,2})\s*(?:日)?\s*(.{1,100})$/);
+ if(!match)return null;
+ const year=Number(match[1]||ctx.year),month=Number(match[2]),day=Number(match[3]);
+ const endYear=Number(match[4]||year),endMonth=Number(match[5]||month),endDay=Number(match[6]);
+ let request=match[7].trim().replace(/^[，,、:：]/,'').trim();
+ // Only expand when the author explicitly asks for EACH date. Never guess for "one of these days".
+ const each=request.match(/(?:各\s*(?:[一二三四五六七八九十]|\d{1,3})\s*(?:顆|個|份|杯|盒|組)?|每(?:天|日)\s*(?:各)?\s*(?:[一二三四五六七八九十]|\d{1,3})\s*(?:顆|個|份|杯|盒|組)?|每(?:天|日)\s*(?:一|1)\s*(?:顆|個|份|杯|盒|組)?)/);
+ if(!each||/(?:任一天|其中一天|擇一|隨便一天)/.test(request))return null;
+ const digits={'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10};
+ const qtyMatch=each[0].match(/([一二三四五六七八九十]|\d{1,3})/);
+ const qty=qtyMatch?(digits[qtyMatch[1]]||Number(qtyMatch[1])):1;
+ request=request.replace(each[0],'').replace(/^[\s，,、]+|[\s，,、]+$/g,'').trim();
+ if(!request||qty<1||qty>50)return null;
+ const from=new Date(Date.UTC(year,month-1,day)),to=new Date(Date.UTC(endYear,endMonth-1,endDay));
+ if(from.getUTCFullYear()!==year||from.getUTCMonth()!==month-1||from.getUTCDate()!==day||
+   to.getUTCFullYear()!==endYear||to.getUTCMonth()!==endMonth-1||to.getUTCDate()!==endDay||
+   to<from||(to-from)/86400000>14)return null;
+ // Do not hide multiple products in one "request" or guess their quantities.
+ if(/[，,、+＋]/.test(request))return null;
+ const out=[];
+ for(let i=0;i<=(to-from)/86400000;i++){
+  const pickup=new Date(from.getTime()+i*86400000).toISOString().slice(0,10);
+  out.push({customer:ctx.customer||'',date:pickup,item:request,qty,
+   notes:s,mode:'add',reviewRequired:true,
+   reason:'日期區間每天各 '+qty+' 份，請確認正式菜單品項及取餐日',
+   sourceIndex:ctx.sourceIndex??0,line:(ctx.lineNo??0)*100+i});
+ }
+ return out;
+}
 function parseLine(line,ctx){const s=canon(line);
+ const eachRange=dateRangeEach(s,ctx);if(eachRange)return eachRange;
  // Specific LINE order: "11/10-11/12 任一雞肉沙拉×1" means one garden salad
  // WITH one chicken add-on on EACH consecutive date, NOT a single flexible date.
  const chickenRange=s.match(/(?:(20\d{2})\s*[\/.年-])?(\d{1,2})\s*[\/.月]\s*(\d{1,2})\s*[-~～至到]\s*(?:(\d{1,2})\s*[\/.月])?(\d{1,2})\s*(?:日)?\s*(?:任一|任選|任何一款)?\s*(?:款|種)?\s*雞肉沙拉\s*(?:[×xX*+]\s*(\d{1,2}))?/);
