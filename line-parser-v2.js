@@ -118,7 +118,15 @@ if(ds.length>1&&ds.every(d=>d.start<hits[0].start)&&
  }
 }
 return result}
-function parse(text,opts={}){const year=opts.year||new Date().getFullYear();const menu=opts.menu||[];let customer='',sourceIndex=0,date=opts.defaultDate||'',lineNo=0,skipping=false;const out=[],lines=String(text).split(/\r?\n/);
+function parse(text,opts={}){const year=opts.year||new Date().getFullYear();const menu=opts.menu||[];let customer='',sourceIndex=0,date=opts.defaultDate||'',lineNo=0,skipping=false;const out=[],rawLines=String(text).split(/\r?\n/);
+const standaloneRange=/^(?:(?:20\d{2})[\/.-])?\d{1,2}\s*[\/.月-]\s*\d{1,2}\s*(?:日)?\s*[-~～至到]\s*(?:(?:20\d{2})[\/.-])?(?:\d{1,2}\s*[\/.月-]\s*)?\d{1,2}\s*(?:日)?$/;
+const lines=[];
+for(let i=0;i<rawLines.length;i++){
+ if(standaloneRange.test(canon(rawLines[i]))&&i+1<rawLines.length&&
+    !/^\s*(?:【截圖|(?:\d{1,2}:)?\d{1,2}:\d{2}\s)/.test(rawLines[i+1])){
+  lines.push(rawLines[i]+' '+rawLines[++i]);
+ }else lines.push(rawLines[i]);
+}
 for(let i=0;i<lines.length;i++){lineNo=i;const rawLine=lines[i];const parts=rawLine.split('\t');
 let lineInput=rawLine;
 if(parts.length>=3 && /^\s*(?:上午|下午)?\s*\d{1,2}:\d{2}/.test(parts[0])){
