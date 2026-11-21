@@ -52,9 +52,19 @@ function candidates(text,opts){
   if(!orderSignal.test(raw)&&!names.some(n=>raw.includes(n)))continue;
   if(/^(?:謝謝|感謝|好|有|沒事)/.test(raw)&&!names.some(n=>raw.includes(n)))continue;
   const lines=raw.split(/\n/).map(canon).filter(Boolean);
+  // A date-only range and its product are often on consecutive LINE lines.
+  // Keep them together so a message sent on 11/20 for 11/24–11/26
+  // cannot silently become an 11/20 pickup order.
+  const pickupRangeOnly=/^(?:(?:20\d{2})[\/.-])?\d{1,2}\s*[\/.月-]\s*\d{1,2}\s*(?:日)?\s*[-~～至到]\s*(?:(?:20\d{2})[\/.-])?(?:\d{1,2}\s*[\/.月-]\s*)?\d{1,2}\s*(?:日)?$/;
+  const prepared=[];
+  for(let i=0;i<lines.length;i++){
+   if(pickupRangeOnly.test(lines[i])&&i+1<lines.length){
+    prepared.push(lines[i]+' '+lines[++i]);
+   }else prepared.push(lines[i]);
+  }
   let current=msg.posted,extracted=[];
-  for(let j=0;j<lines.length;j++){
-   const line=lines[j],yy=+msg.posted.slice(0,4);
+  for(let j=0;j<prepared.length;j++){
+   const line=prepared[j],yy=+msg.posted.slice(0,4);
    if(/明天|明早|明日/.test(line)&&!/\d{1,2}\s*\/\s*\d{1,2}/.test(line))current=plus(msg.posted,1);
    else if(/後天/.test(line)&&!/\d{1,2}\s*\/\s*\d{1,2}/.test(line))current=plus(msg.posted,2);
    else if(/今天|今早|今日/.test(line)&&!/\d{1,2}\s*\/\s*\d{1,2}/.test(line))current=msg.posted;
