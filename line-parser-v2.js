@@ -104,6 +104,19 @@ function parseLine(line,ctx){const s=canon(line);
   }
  }
 const ds=dates(s,ctx.year);if(!ds.length&&!ctx.defaultDate)return [];
+// When each date has its own product text, parse each dated section independently.
+// Keep paired dates such as "11/10＋11/11 咖啡核桃＋紅茶" for the shared-list rule below.
+if(ds.length>1&&ds.every((d,i)=>/[一-龥A-Za-z]/.test(s.slice(d.end,ds[i+1]?.start||s.length)))&&
+   !/(?:任一天|其中一天|擇一|隨便一天)/.test(s)){
+ const separated=ds.flatMap((d,i)=>{
+  const section=d.date+' '+s.slice(d.end,ds[i+1]?.start||s.length).trim();
+  return parseLine(section,{...ctx,defaultDate:d.date,lineNo:(ctx.lineNo??0)*100+i}).map((x,k)=>({
+   ...x,notes:s,line:(ctx.lineNo??0)*10000+i*100+k,
+   reviewRequired:true,reason:x.reason||'依原文日期分配品項，請核對'
+  }));
+ });
+ if(separated.length)return separated;
+}
 const explicitList=explicitItemList(s,ctx,ds);if(explicitList)return explicitList;
 const hits=itemMatches(s,ctx.menu);
 if(!hits.length){
