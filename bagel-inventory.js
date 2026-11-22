@@ -43,6 +43,15 @@ function canonicalBagel(name,names){
  if(recognized&&names.includes(recognized))return recognized;
  return null;
 }
+function orderBagelName(item,names){
+ const direct=canonicalBagel(item,names);
+ if(direct)return direct;
+ // A customized meal consumes one honey-oat bagel per ordered portion.
+ // Do not search notes: they may mention other pickup dates and products.
+ if(String(item||'').normalize('NFKC').replace(/\s+/g,'').includes('蜂蜜燕麥')&&
+    names.includes('蜂蜜燕麥貝果'))return '蜂蜜燕麥貝果';
+ return null;
+}
 function model(){
  const names=menuBagels(),booked=new Map(),unknown=[];
  // At Friday 23:59 the previous week's inventory is closed, but next week's
@@ -50,7 +59,7 @@ function model(){
  // Do NOT return a zeroed model: it would conceal already-booked orders.
  for(const x of orders){
   if(x.status!=='active'||x.pickup_date<week||x.pickup_date>endOfWeek())continue;
-  const name=canonicalBagel(x.item,names);
+  const name=orderBagelName(x.item,names);
   if(name)booked.set(name,(booked.get(name)||0)+Number(x.quantity));
   else if(/貝果|明太子|芋頭|阿華田|紅寶石|流沙/.test(x.item)&&!/吐司|三明治|漢堡|沙拉/.test(x.item))unknown.push(x.item);
  }
@@ -105,7 +114,7 @@ function mount(){
  '<div class="card"><h3>📦 每週期初庫存</h3><p class="hint" id="biMenuSource">正在同步正式菜單的貝果品項…</p><p class="hint">空白＝未設定；填 0＝零庫存。整週自動扣除已確認訂單。</p>',
  '<form id="biOpeningForm"><div id="biOpenRows"></div><button type="submit" id="biSaveOpening">儲存本週期初庫存</button></form></div>',
  '<div class="card"><h3>📊 本週庫存與訂單預留</h3>',
- '<p class="hint">可用庫存＝期初＋補貨＋零售更正−本週有效訂單−現場零售；尚未核准的訂單不計入。</p>',
+ '<p class="hint">可用庫存＝期初＋補貨＋零售更正−本週有效訂單−現場零售；含蜂蜜燕麥的客製餐點按每份 1 顆蜂蜜燕麥貝果預留。尚未核准的訂單不計入。</p>',
  '<div class="bi-table-wrap"><table class="bi-table"><thead><tr><th>品項</th><th>期初</th><th>訂單</th><th>零售</th><th>補回</th><th>剩餘</th></tr></thead><tbody id="biBalances"></tbody></table></div>',
  '<p id="biUnknown" class="hint"></p></div>',
  '<div class="card"><h3>🏪 現場零售／補貨登記</h3>',
