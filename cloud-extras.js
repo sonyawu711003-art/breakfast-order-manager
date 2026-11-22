@@ -132,27 +132,39 @@ function groupPendingProposals(){
  return [...groups.values()];
 }
 function pendingAmount(p){return p.total_override!=null?Number(p.total_override):p.price!=null?Number(p.price)*p.quantity:null}
+function possibleMissingItems(ps){
+ if(!window.BreakfastLineParser||!ps.length)return 0;
+ const first=ps[0],source=String(first.notes||'').trim();
+ if(!source)return 0;
+ const parsed=window.BreakfastLineParser.parseLine(source,{
+  customer:first.customer,year:Number(first.pickup_date.slice(0,4)),defaultDate:first.pickup_date,
+  menu:menuRows.map(m=>m.name),lineNo:0
+ });
+ return Math.max(0,parsed.filter(x=>x.date===first.pickup_date).length-ps.length);
+}
 function drawProposals(){
  const grouped=groupPendingProposals(),pending=grouped.reduce((sum,ps)=>sum+ps.length,0);
  document.getElementById('proposalList').innerHTML=
  '<p class="hint">待審：'+grouped.length+' 組客人／取餐日，共 '+pending+' 個品項</p>'+
  grouped.map((ps,g)=>{
  const first=ps[0],totals=ps.map(pendingAmount),complete=totals.every(t=>t!==null);
+ const missing=possibleMissingItems(ps);
  const total=complete?money(totals.reduce((sum,n)=>sum+n,0)):'部分品項尚未定價';
  const originalTexts=[...new Set(ps.map(p=>p.ocr_text).filter(Boolean))];
  return '<div class="card" style="border:1px solid #c5dfce">'+
    '<div class="row"><b>🧾 '+htmlEscape(first.customer)+'</b><b>'+htmlEscape(first.pickup_date)+'</b></div>'+
    '<p class="hint">同客人同日期，共 '+ps.length+' 個待審品項</p>'+
+   (missing?'<p class="warn">⚠️ 原始訊息在本取餐日可能還有 '+missing+' 個品項未列入待審。請整單退回並重新匯入，不要核准這張漏項訂單。</p>':'')+
    ps.map(p=>'<div style="border-top:1px solid #e0e9e2;padding:9px 0">'+
     '<div class="row"><span><b>'+htmlEscape(p.item)+'</b> ×'+p.quantity+'</span><span>'+money(pendingAmount(p))+'</span></div>'+
     '<div class="hint">處理：'+htmlEscape(p.change_type)+'</div>'+
     '<p class="note">'+htmlEscape(p.notes)+'</p>'+
     '<div class="row"><button class="secondary" data-image="'+p.id+'" '+(p.screenshot_path?'':'disabled')+'>查看截圖</button>'+
-    '<button class="secondary" data-review="'+p.id+'" data-decision="approve">單項核准</button>'+
+    '<button class="secondary" data-review="'+p.id+'" data-decision="approve" '+(missing?'disabled':'')+'>單項核准</button>'+
     '<button class="secondary" data-review="'+p.id+'" data-decision="reject">單項退回</button></div></div>').join('')+
    '<p><b>整單合計：'+total+'</b></p>'+
    '<details><summary>原始文字（去重）</summary>'+originalTexts.map(t=>'<pre style="white-space:pre-wrap">'+htmlEscape(t)+'</pre>').join('')+'</details>'+
-   '<div class="row"><button data-review-group="'+g+'" data-group-decision="approve">整單核准</button>'+
+   '<div class="row"><button data-review-group="'+g+'" data-group-decision="approve" '+(missing?'disabled':'')+'>整單核准</button>'+
    '<button class="secondary" data-review-group="'+g+'" data-group-decision="reject">整單退回</button></div></div>';
  }).join('')||'<p>沒有待審核訂單</p>';
  document.querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>reviewProposal(b.dataset.review,b.dataset.decision));
@@ -161,6 +173,7 @@ function drawProposals(){
 }
 async function reviewProposalGroup(index,decision){
  const ps=groupPendingProposals()[index];if(!ps||!ps.length)return;
+ if(decision==='approve'&&possibleMissingItems(ps)){alert('原始訊息有未列入待審的品項，請整單退回並重新匯入。');return}
  const group=ps[0].customer+'｜'+ps[0].pickup_date;
  let note='';
  if(decision==='approve'){
@@ -183,7 +196,7 @@ async function reviewProposalGroup(index,decision){
  }
 }
 async function openShot(id){const p=proposalRows.find(x=>x.id===id);if(!p||!p.screenshot_path)return;const {data,error}=await client.storage.from('breakfast-line-shots').createSignedUrl(p.screenshot_path,120);if(error){alert(error.message);return}window.open(data.signedUrl,'_blank','noopener')}
-async function reviewProposal(id,decision){const p=proposalRows.find(x=>x.id===id);if(!p)return;let note='';if(decision==='approve'){if(!confirm('確定核准 '+p.customer+'｜'+p.item+' ×'+p.quantity+'？將更新正式訂單。'))return}else{const v=prompt('退回原因（可留空）','');if(v===null)return;note=v}
+async function reviewProposal(id,decision){const p=proposalRows.find(x=>x.id===id);if(!p)return;let note='';if(decision==='approve'&&possibleMissingItems(groupPendingProposals().find(ps=>ps.some(x=>x.id===id))||[])){alert('原始訊息有未列入待審的品項，請整單退回並重新匯入。');return}if(decision==='approve'){if(!confirm('確定核准 '+p.customer+'｜'+p.item+' ×'+p.quantity+'？將更新正式訂單。'))return}else{const v=prompt('退回原因（可留空）','');if(v===null)return;note=v}
 const {error}=await client.rpc('breakfast_review_proposal',{proposal_id:id,decision,note});if(error){alert('審核失敗：'+error.message);return}await reload();await refreshExtras()}
 function updateAmount(){const active=orders.filter(x=>x.status==='active');let sum=0,unknown=0;for(const o of active){const amount=o.total_override!==null&&o.total_override!==undefined?Number(o.total_override):o.price!==null?Number(o.price)*o.quantity:null;if(amount===null)unknown++;else sum+=amount}document.getElementById('cloudRevenue').textContent='已定價訂單合計 '+money(sum)+'；另有 '+unknown+' 筆未定價（未計入合計）'}
 extrasMount();

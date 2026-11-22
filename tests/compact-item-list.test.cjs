@@ -48,4 +48,11 @@ const weiExpected = [
 assert.deepEqual(rows(parser.parse('瑋瑋\n' + weiText, {year: 2026, menu: ['明太子','明太子燻雞雞蛋三明治']})), weiExpected);
 assert.deepEqual(rows(txt.candidates('日, 11/22/2026\n上午9:58\t瑋瑋\t' + weiText, {menu: ['明太子','明太子燻雞雞蛋三明治']}).candidates), weiExpected);
 assert.equal(parser.parseLine('11/24 巧克力花生貝果、明太子熏雞三明治×2', {customer:'瑋瑋',year:2026,menu:['明太子']})[1].qty,2);
+const reviewCode = fs.readFileSync(path.join(__dirname, '..', 'cloud-extras.js'), 'utf8');
+const auditFunction = reviewCode.slice(reviewCode.indexOf('function possibleMissingItems('), reviewCode.indexOf('function drawProposals()'));
+const audit = {window:browser.window,menuRows:[{name:'巧克力花生焦糖貝果'}]};
+vm.createContext(audit);vm.runInContext(auditFunction,audit);
+const pending=[{customer:'紜芳',pickup_date:'2026-11-24',notes:multiDayText,item:'巧克力花生焦糖貝果'}];
+assert.equal(audit.possibleMissingItems(pending),1);
+assert.equal(audit.possibleMissingItems([...pending,{...pending,item:'芝麻奶霜'}]),0);
 console.log('compact item list: passed');
