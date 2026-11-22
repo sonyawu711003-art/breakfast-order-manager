@@ -40,4 +40,12 @@ assert.deepEqual(rows(txt.candidates('日, 11/22/2026\n上午11:52\t張儷齡Lis
 assert.ok(parser.parseLine(lisaText, {customer: '張儷齡Lisa', year: 2026, menu: ['雞肉沙拉']}).every(x => x.notes.includes('醬多一點')));
 assert.equal(parser.parseLine('11/10＋11/11 咖啡核桃＋紅茶', {customer: '甲', year: 2026, menu: ['咖啡核桃','紅茶']}).length, 4);
 assert.equal(parser.parseLine('11/24 明太子貝果+2', {customer: '菊子', year: 2026, menu: ['明太子貝果']}).length, 1);
+const weiText = '11/24巧克力花生貝果、明太子熏雞三明治謝謝';
+const weiExpected = [
+  ['瑋瑋', '2026-11-24', '巧克力花生貝果', 1],
+  ['瑋瑋', '2026-11-24', '明太子熏雞三明治', 1],
+];
+assert.deepEqual(rows(parser.parse('瑋瑋\n' + weiText, {year: 2026, menu: ['明太子','明太子燻雞雞蛋三明治']})), weiExpected);
+assert.deepEqual(rows(txt.candidates('日, 11/22/2026\n上午9:58\t瑋瑋\t' + weiText, {menu: ['明太子','明太子燻雞雞蛋三明治']}).candidates), weiExpected);
+assert.equal(parser.parseLine('11/24 巧克力花生貝果、明太子熏雞三明治×2', {customer:'瑋瑋',year:2026,menu:['明太子']})[1].qty,2);
 console.log('compact item list: passed');

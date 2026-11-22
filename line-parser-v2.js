@@ -37,6 +37,27 @@ function explicitItemList(s,ctx,ds){
   mode:'add',reviewRequired:true,reason:'連寫多品項；請逐項核對正式菜單與數量',
   sourceIndex:ctx.sourceIndex??0,line:(ctx.lineNo??0)*100+i}));
 }
+function separatedItemList(s,ctx,ds){
+ // Keep both products when a customer writes "11/24巧克力花生貝果、明太子熏雞三明治謝謝".
+ // A short ingredient inside a sandwich name must not be matched as a bagel.
+ if(ds.length!==1||ds[0].start!==0)return null;
+ const body=s.slice(ds[0].end).trim();
+ if(!/[，,]/.test(body))return null;
+ const parts=body.split(/[，,]/).map(x=>x.replace(/(?:謝謝|感謝|麻煩你|麻煩了)[!！。\s]*$/,'').trim());
+ if(parts.length<2||parts.some(x=>!x))return null;
+ const entries=[];
+ for(const part of parts){
+  const q=part.match(/^(.+?)\s*(?:[×xX*+]\s*(\d{1,2})|(\d{1,2})\s*(?:個|顆|份|杯|盒|組))$/);
+  const item=(q?q[1]:part).trim().replace(/^(?:我要|想要|幫我留|預訂)\s*/,'');
+  if(item.length<2||item.length>60)return null;
+  if(!item||(!/(?:貝果|三明治|沙拉|吐司|漢堡|紅茶|奶茶|咖啡|可頌)/.test(item)&&
+     !itemMatches(item,ctx.menu).some(h=>h.start===0&&h.end===item.length)&&!q))return null;
+  entries.push({item,qty:Number(q?.[2]||q?.[3]||1)});
+ }
+ return entries.map((x,i)=>({customer:ctx.customer||'',date:ds[0].date,item:x.item,qty:x.qty,notes:s,
+  mode:'add',reviewRequired:true,reason:'頓號分隔多品項；請逐項確認正式菜單',
+  sourceIndex:ctx.sourceIndex??0,line:(ctx.lineNo??0)*100+i}));
+}
 function joinWrappedItemLists(lines,year){
  const out=[];
  for(let i=0;i<lines.length;i++){
@@ -118,6 +139,7 @@ if(ds.length>1&&ds.every((d,i)=>/[一-龥A-Za-z]/.test(s.slice(d.end,ds[i+1]?.st
  if(separated.length)return separated;
 }
 const explicitList=explicitItemList(s,ctx,ds);if(explicitList)return explicitList;
+const separatedList=separatedItemList(s,ctx,ds);if(separatedList)return separatedList;
 const hits=itemMatches(s,ctx.menu);
 if(!hits.length){
  // Retain unrecognized product names when the customer explicitly provides an item AND a quantity.
