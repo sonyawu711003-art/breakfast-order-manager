@@ -21,15 +21,19 @@ function dates(s,year){const out=[];for(const m of String(s).matchAll(dateRE)){c
 function itemMatches(s,extra){const names=[...new Set([...catalog,...(extra||[])])].filter(Boolean).sort((a,b)=>b.length-a.length);const hits=[];for(let i=0;i<s.length;i++){const name=names.find(n=>s.startsWith(n,i));if(!name)continue;hits.push({item:name,start:i,end:i+name.length});i+=name.length-1}return hits}
 function qtyAfter(fragment){const m=fragment.match(/^\s*(?:[×xX*+]\s*(\d{1,2})|(\d{1,2})\s*(?:個|顆|份|杯|組)?(?=\s*(?:[，,、+]|$|謝謝|不加|不要|加蛋|加厚蛋)))/);return m?Number(m[1]||m[2]):1}
 function explicitItemList(s,ctx,ds){
- // A compact list such as "11/25 巧克力花生焦糖1檸檬1明太子1".
- // Only accept a complete, date-led list; unknown names remain review items.
- if(ds.length!==1||!/^\s*(?:20\d{2}[\/.年-])?\d{1,2}\s*[\/.月-]\s*\d{1,2}/.test(s))return null;
- const body=s.slice(ds[0].end).replace(/^\s*[，,、:：]?\s*/,'');
- const re=/\s*[，,、]?\s*([^\d\s，,、;；+＋×xX*]{1,40}?)\s*(?:[×xX*+]\s*)?(\d{1,2})\s*(?:顆|個|份|杯|盒|組)?/gy;
- const entries=[];let at=0,m;
- while(at<body.length){re.lastIndex=at;m=re.exec(body);if(!m)return null;entries.push({item:m[1].trim(),qty:Number(m[2])});at=re.lastIndex}
+ // A compact list may span dates: "11/24芝麻奶霜×2+巧克力花生焦糖×1 11/26檸檬×1".
+ // Require complete date-led segments so unrelated notes cannot become products.
+ if(!ds.length||!/^\s*(?:20\d{2}[\/.年-])?\d{1,2}\s*[\/.月-]\s*\d{1,2}/.test(s))return null;
+ const entries=[];
+ for(let d=0;d<ds.length;d++){
+  const body=s.slice(ds[d].end,ds[d+1]?.start||s.length).replace(/^\s*[，,、:：]?\s*/,'');
+  const re=/\s*[+，,、]?\s*([^\d\s，,、;；+×xX*]{1,40}?)\s*(?:[×xX*+]\s*)?(\d{1,2})\s*(?:顆|個|份|杯|盒|組)?/gy;
+  let at=0,m,found=0;
+  while(at<body.length){re.lastIndex=at;m=re.exec(body);if(!m)return null;entries.push({date:ds[d].date,item:m[1].trim(),qty:Number(m[2])});at=re.lastIndex;found++}
+  if(!found)return null;
+ }
  if(entries.length<2||entries.some(x=>!x.item||x.qty<1||x.qty>50))return null;
- return entries.map((x,i)=>({customer:ctx.customer||'',date:ds[0].date,item:x.item,qty:x.qty,notes:s,
+ return entries.map((x,i)=>({customer:ctx.customer||'',date:x.date,item:x.item,qty:x.qty,notes:s,
   mode:'add',reviewRequired:true,reason:'連寫多品項；請逐項核對正式菜單與數量',
   sourceIndex:ctx.sourceIndex??0,line:(ctx.lineNo??0)*100+i}));
 }

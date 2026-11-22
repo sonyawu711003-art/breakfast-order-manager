@@ -21,5 +21,13 @@ assert.deepEqual(rows(parser.parse('陳慧君\n11/25 巧克力花生焦糖1檸�
 assert.deepEqual(rows(parser.parse('陳慧君\n11/25 巧克力花生焦糖1檸檬1明\n太子1', {year: 2026, menu: ['明太子']})), expected);
 const exportText = '日, 11/22/2026\n上午10:23\t陳慧君\t11/25 巧克力花生焦糖1檸檬1明\n太子1';
 assert.deepEqual(rows(txt.candidates(exportText, {menu: ['明太子']}).candidates), expected);
+const multiDay = [
+  ['菊子', '2026-11-24', '芝麻奶霜', 2],
+  ['菊子', '2026-11-24', '巧克力花生焦糖', 1],
+  ['菊子', '2026-11-26', '檸檬', 1],
+];
+const multiDayText = '11/24芝麻奶霜×2+巧克力花生焦糖×1 11/26檸檬×1';
+assert.deepEqual(rows(parser.parse('菊子\n' + multiDayText, {year: 2026, menu: ['芝麻奶霜']})), multiDay);
+assert.deepEqual(rows(txt.candidates('日, 11/22/2026\n上午10:38\t菊子\t' + multiDayText, {menu: ['芝麻奶霜']}).candidates), multiDay);
 assert.equal(parser.parseLine('11/24 明太子貝果+2', {customer: '菊子', year: 2026, menu: ['明太子貝果']}).length, 1);
 console.log('compact item list: passed');
