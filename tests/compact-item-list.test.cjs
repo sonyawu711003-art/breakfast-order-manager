@@ -1,0 +1,25 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+const browser = {window: {}, Date};
+vm.createContext(browser);
+for (const file of ['line-parser-v2.js', 'line-txt-v3.js']) {
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), browser);
+}
+const parser = browser.window.BreakfastLineParser;
+const txt = browser.window.BreakfastLineTxt;
+const rows = result => Array.from(result, x => [x.customer, x.date, x.item, x.qty]);
+const expected = [
+  ['陳慧君', '2026-11-25', '巧克力花生焦糖', 1],
+  ['陳慧君', '2026-11-25', '檸檬', 1],
+  ['陳慧君', '2026-11-25', '明太子', 1],
+];
+
+assert.deepEqual(rows(parser.parse('陳慧君\n11/25 巧克力花生焦糖1檸檬1明太子1', {year: 2026, menu: ['明太子']})), expected);
+assert.deepEqual(rows(parser.parse('陳慧君\n11/25 巧克力花生焦糖1檸檬1明\n太子1', {year: 2026, menu: ['明太子']})), expected);
+const exportText = '日, 11/22/2026\n上午10:23\t陳慧君\t11/25 巧克力花生焦糖1檸檬1明\n太子1';
+assert.deepEqual(rows(txt.candidates(exportText, {menu: ['明太子']}).candidates), expected);
+assert.equal(parser.parseLine('11/24 明太子貝果+2', {customer: '菊子', year: 2026, menu: ['明太子貝果']}).length, 1);
+console.log('compact item list: passed');

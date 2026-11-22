@@ -62,9 +62,10 @@ function candidates(text,opts){
     prepared.push(lines[i]+' '+lines[++i]);
    }else prepared.push(lines[i]);
   }
+  const joined=window.BreakfastLineParser.joinWrappedItemLists(prepared,+msg.posted.slice(0,4));
   let current=msg.posted,extracted=[];
-  for(let j=0;j<prepared.length;j++){
-   const line=prepared[j],yy=+msg.posted.slice(0,4);
+  for(let j=0;j<joined.length;j++){
+   const line=joined[j],yy=+msg.posted.slice(0,4);
    if(/明天|明早|明日/.test(line)&&!/\d{1,2}\s*\/\s*\d{1,2}/.test(line))current=plus(msg.posted,1);
    else if(/後天/.test(line)&&!/\d{1,2}\s*\/\s*\d{1,2}/.test(line))current=plus(msg.posted,2);
    else if(/今天|今早|今日/.test(line)&&!/\d{1,2}\s*\/\s*\d{1,2}/.test(line))current=msg.posted;

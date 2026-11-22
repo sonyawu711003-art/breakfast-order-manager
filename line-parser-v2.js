@@ -20,6 +20,31 @@ function canon(s){return normal(s).replace(/(?:蔓越梅|蔓越苺|曼越梅|曼
 function dates(s,year){const out=[];for(const m of String(s).matchAll(dateRE)){const y=(m[0].match(/20\d{2}/)||[])[0]||String(year);const month=+m[1],day=+m[2];const d=new Date(+y,month-1,day);if(month<1||month>12||day<1||d.getMonth()!==month-1)continue;out.push({start:m.index,end:m.index+m[0].length,date:y+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0')})}return out}
 function itemMatches(s,extra){const names=[...new Set([...catalog,...(extra||[])])].filter(Boolean).sort((a,b)=>b.length-a.length);const hits=[];for(let i=0;i<s.length;i++){const name=names.find(n=>s.startsWith(n,i));if(!name)continue;hits.push({item:name,start:i,end:i+name.length});i+=name.length-1}return hits}
 function qtyAfter(fragment){const m=fragment.match(/^\s*(?:[×xX*+]\s*(\d{1,2})|(\d{1,2})\s*(?:個|顆|份|杯|組)?(?=\s*(?:[，,、+]|$|謝謝|不加|不要|加蛋|加厚蛋)))/);return m?Number(m[1]||m[2]):1}
+function explicitItemList(s,ctx,ds){
+ // A compact list such as "11/25 巧克力花生焦糖1檸檬1明太子1".
+ // Only accept a complete, date-led list; unknown names remain review items.
+ if(ds.length!==1||!/^\s*(?:20\d{2}[\/.年-])?\d{1,2}\s*[\/.月-]\s*\d{1,2}/.test(s))return null;
+ const body=s.slice(ds[0].end).replace(/^\s*[，,、:：]?\s*/,'');
+ const re=/\s*[，,、]?\s*([^\d\s，,、;；+＋×xX*]{1,40}?)\s*(?:[×xX*+]\s*)?(\d{1,2})\s*(?:顆|個|份|杯|盒|組)?/gy;
+ const entries=[];let at=0,m;
+ while(at<body.length){re.lastIndex=at;m=re.exec(body);if(!m)return null;entries.push({item:m[1].trim(),qty:Number(m[2])});at=re.lastIndex}
+ if(entries.length<2||entries.some(x=>!x.item||x.qty<1||x.qty>50))return null;
+ return entries.map((x,i)=>({customer:ctx.customer||'',date:ds[0].date,item:x.item,qty:x.qty,notes:s,
+  mode:'add',reviewRequired:true,reason:'連寫多品項；請逐項核對正式菜單與數量',
+  sourceIndex:ctx.sourceIndex??0,line:(ctx.lineNo??0)*100+i}));
+}
+function joinWrappedItemLists(lines,year){
+ const out=[];
+ for(let i=0;i<lines.length;i++){
+  let line=lines[i],next=lines[i+1];
+  // OCR or a narrow LINE bubble may wrap inside a product name (明\n太子1).
+  if(next&&dates(line,year).length===1&&!dates(next,year).length&&
+     /\d\s*[^\d\s，,、]+$/.test(line)&&/^\s*[^\d\s，,、]+\s*\d/.test(next)&&
+     explicitItemList(canon(line+next),{year},dates(canon(line+next),year))){line+=next;i++}
+  out.push(line);
+ }
+ return out;
+}
 function dateRangeEach(s,ctx){
  // A contiguous date range followed by one product and "each day" quantity.
  // Examples: 11/18~11/20生菜沙拉各一, 11/18-20沙拉每天1份.
@@ -74,7 +99,9 @@ function parseLine(line,ctx){const s=canon(line);
    return out;
   }
  }
-const ds=dates(s,ctx.year);if(!ds.length&&!ctx.defaultDate)return [];const hits=itemMatches(s,ctx.menu);
+const ds=dates(s,ctx.year);if(!ds.length&&!ctx.defaultDate)return [];
+const explicitList=explicitItemList(s,ctx,ds);if(explicitList)return explicitList;
+const hits=itemMatches(s,ctx.menu);
 if(!hits.length){
  // Retain unrecognized product names when the customer explicitly provides an item AND a quantity.
  // This is a review-only fallback: never auto-pick a menu item or silently omit an order line.
@@ -125,9 +152,10 @@ for(let i=0;i<rawLines.length;i++){
  if(standaloneRange.test(canon(rawLines[i]))&&i+1<rawLines.length&&
     !/^\s*(?:【截圖|(?:\d{1,2}:)?\d{1,2}:\d{2}\s)/.test(rawLines[i+1])){
   lines.push(rawLines[i]+' '+rawLines[++i]);
- }else lines.push(rawLines[i]);
+}else lines.push(rawLines[i]);
 }
-for(let i=0;i<lines.length;i++){lineNo=i;const rawLine=lines[i];const parts=rawLine.split('\t');
+const joined=joinWrappedItemLists(lines,year);
+for(let i=0;i<joined.length;i++){lineNo=i;const rawLine=joined[i];const parts=rawLine.split('\t');
 let lineInput=rawLine;
 if(parts.length>=3 && /^\s*(?:上午|下午)?\s*\d{1,2}:\d{2}/.test(parts[0])){
  customer=parts[1].trim();lineInput=parts.slice(2).join(' ');
@@ -135,7 +163,7 @@ if(parts.length>=3 && /^\s*(?:上午|下午)?\s*\d{1,2}:\d{2}/.test(parts[0])){
 const s=canon(lineInput);if(!s)continue;const src=s.match(/^【截圖\s*(\d+)】/);if(src){sourceIndex=+src[1]-1;customer='';date=opts.defaultDate||'';skipping=false;continue}
 if(/吃早餐\s*[|｜]/.test(s)&&/口味|NEW|下週|預訂|限量/.test(s)){skipping=true;customer='';continue}
 if(skipping){
- const next=canon(lines[i+1]||''),third=canon(lines[i+2]||'');
+ const next=canon(joined[i+1]||''),third=canon(joined[i+2]||'');
  const speaker=s.length<=25&&!dates(s,year).length&&!itemMatches(s,menu).length
    &&((dates(next,year).length&&itemMatches(next,menu).length)
    ||(dates(next,year).length&&itemMatches(third,menu).length));
@@ -148,10 +176,10 @@ const nameHeader=s.match(/^(?:\d{1,2}:\d{2}\s*)?([^\d:：\s][^:：\n]{1,23})\s*[
 if(nameHeader&&!itemMatches(nameHeader[1],menu).length){customer=nameHeader[1].trim();if(!nameHeader[2])continue;out.push(...parseLine(nameHeader[2],{year,menu,customer,sourceIndex,defaultDate:date,lineNo}));continue}
 // If a line is only a display name, it is too easy to mistake product words for names.
 // Keep the name only when the next line clearly contains a date and item.
-if(!dates(s,year).length&&!itemMatches(s,menu).length&&s.length<=25&&/[一-龥A-Za-z]/.test(s)&&!/^上午|下午/.test(s)){const next=canon(lines[i+1]||'');if((dates(next,year).length&&itemMatches(next,menu).length)||(dates(next,year).length&&itemMatches(canon(lines[i+2]||''),menu).length)){customer=s;continue}}
+if(!dates(s,year).length&&!itemMatches(s,menu).length&&s.length<=25&&/[一-龥A-Za-z]/.test(s)&&!/^上午|下午/.test(s)){const next=canon(joined[i+1]||'');if((dates(next,year).length&&itemMatches(next,menu).length)||(dates(next,year).length&&itemMatches(canon(joined[i+2]||''),menu).length)){customer=s;continue}}
 const d=dates(s,year);if(d.length)date=d[d.length-1].date;
 out.push(...parseLine(s,{year,menu,customer,sourceIndex,defaultDate:date,lineNo}));
 }
 return out}
-window.BreakfastLineParser={parse,parseLine,dates};
+window.BreakfastLineParser={parse,parseLine,dates,joinWrappedItemLists};
 })();
