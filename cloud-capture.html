@@ -72,7 +72,7 @@ function normalizeCandidateItem(p){
   p.catalogStatus='matched';p.catalogHint=initial===p.item?'':'由「'+initial+'」對應正式菜單「'+p.item+'」';
  }else{
   p.catalogStatus=found.status;
-  p.catalogHint=found.status==='ambiguous'?'「'+initial+'」可能是：'+found.matches.map(x=>x.name).join('、')+'；請從下拉選單確認正式品名':'「'+initial+'」尚未匹配到菜單；已保留原始數量，請從下拉選單選擇正式品項';
+  p.catalogHint=found.status==='ambiguous'?'「'+initial+'」可能是：'+found.matches.map(x=>x.name).join('、')+'；請從下拉選單確認正式品名':'「'+initial+'」尚未匹配到菜單；可直接新增正式菜單品項，原始數量與備註會保留';
   p.price='';p.flag=true;p.reason=p.catalogHint;
  }
 }
@@ -150,6 +150,34 @@ function menuChoiceOptions(original){
  const categories=[...new Set(remaining.map(x=>x.category))].sort((a,b)=>a.localeCompare(b,'zh-TW'));
  return suggestions+categories.map(cat=>'<optgroup label="'+esc(cat)+'">'+remaining.filter(x=>x.category===cat).map(option).join('')+'</optgroup>').join('');
 }
+const menuCategories=['貝果','三明治','漢堡','吐司','沙拉','輕食','沙拉加購','韓式吐司','小漢堡','輕食堡','歐式','飲品','飲料','甜點','禮盒','小禮盒','其他'];
+function newMenuFields(i){return '<details class="new-menu-fields"><summary>➕ 菜單沒有這個品項？直接新增</summary><p class="hint">新增後會直接套用到此候選品項；既有訂單價格不會更動。</p>'+
+ '<label>正式品名<input data-new-name="'+i+'" maxlength="150" value="'+esc(proposals[i].item)+'"></label>'+
+ '<label>類別<select data-new-category="'+i+'"><option value="">請選擇類別</option>'+menuCategories.map(c=>'<option>'+esc(c)+'</option>').join('')+'</select></label>'+
+ '<div class="cols"><label>售價／群友價<input type="number" min="0" step=".01" data-new-price="'+i+'" placeholder="未定價可留空"></label><label class="hidden" data-regular-label="'+i+'">一般售價<input type="number" min="0" step=".01" data-new-regular="'+i+'" placeholder="未定價可留空"></label></div>'+
+ '<p class="hint">貝果與甜點可分別填群友價、一般售價；其他類別只有單一售價。</p><button type="button" data-create-menu="'+i+'">儲存菜單並套用到此品項</button><p class="red" data-menu-error="'+i+'" role="alert"></p></details>'}
+async function createCandidateMenu(i,button){
+ const p=proposals[i],line=button.closest('.order-line');if(!p||!line)return;
+ const name=line.querySelector('[data-new-name]').value.trim(),category=line.querySelector('[data-new-category]').value;
+ const rawPrice=line.querySelector('[data-new-price]').value,rawRegular=line.querySelector('[data-new-regular]').value;
+ const error=line.querySelector('[data-menu-error]');error.textContent='';
+ if(!name||name.length>150){error.textContent='請填寫 1 至 150 字的正式品名';return}
+ if(!menuCategories.includes(category)){error.textContent='請選擇有效類別';return}
+ if([rawPrice,rawRegular].some(v=>v!==''&&(!Number.isFinite(Number(v))||Number(v)<0))){error.textContent='售價不可為負數';return}
+ const active=menu.find(m=>m.name===name);
+ if(active){p.item=active.name;normalizeCandidateItem(p);drawCandidates();return}
+ button.disabled=true;
+ const eligible=category==='貝果'||category==='甜點';
+ const price=rawPrice===''?null:Number(rawPrice),regular_price=eligible?(rawRegular===''?null:Number(rawRegular)):price;
+ try{
+  const {data, error:insertError}=await api.from('breakfast_menu').insert({name,category,price,regular_price,description:'',active:true}).select('*').single();
+  if(insertError||!data)throw new Error(insertError?.message||'菜單未儲存');
+  menu.push(data);
+  p.item=data.name;normalizeCandidateItem(p);drawCandidates();
+  $('sendMsg').textContent='✅ 已新增菜單「'+data.name+'」並套用到候選單；請核對價格後送審。';
+ }catch(e){error.textContent=/duplicate|unique|23505/i.test(e.message)?'此品名已在菜單中（可能已停用）。請到「菜單」頁啟用或修改，然後重新匯入。':'新增菜單失敗：'+e.message}
+ finally{button.disabled=false}
+}
 function newCandidate(data={}){return {check:false,customer:'',date:$('defaultDate').value,item:'',qty:1,price:'',total:'',notes:'',mode:'add',target:'',sourceIndex:0,line:0,...data}}
 function extractCandidates(){
 const raw=$('rawText').value;if(!raw.trim()){alert('請先辨識或貼上文字');return}
@@ -197,6 +225,7 @@ function drawCandidates(){
       '<label>單價<input type="number" min="0" step=".01" data-i="'+i+'" data-k="price" value="'+esc(p.price)+'"></label><div><label>品項小計（自動計算）</label><div class="auto-subtotal" data-i="'+i+'" data-subtotal="true">'+(candidateAmount(p)===null?'⚠️ 單價待確認':money(candidateAmount(p)))+'</div></div></div>'+
       '<p class="hint" style="margin:7px 0;color:'+(p.catalogStatus==='matched'?'#6c7751':'#b25b2d')+'">'+(p.catalogHint?'📋 '+esc(p.catalogHint):'')+'</p>'+ 
       (p.catalogStatus==='ambiguous'||p.catalogStatus==='unknown'?'<label class="candidate-menu-confirm">⚠️ 未確認正式菜單品項（原文：'+esc(p.item)+'）<select data-i="'+i+'" data-k="chooseItem" required><option value="">請選擇對應的正式品項</option>'+menuChoiceOptions(p.item)+'</select></label>':'')+
+      (p.catalogStatus==='unknown'?newMenuFields(i):'')+
       '<div class="row"><span class="hint">'+(p.total!==''?'🧾 此筆使用特別金額（覆蓋自動計算）':'✅ 數量 × 單價，自動計算')+'</span><span class="hint">'+(p.flag?'⚠️ '+esc(p.reason||'需核對'):'待審核')+'</span></div>'+ 
       '<details class="total-override" '+(p.total!==''?'open':'')+'><summary>特殊折扣／組合優惠：手動指定本品項總額</summary><label>特別總額（留空即自動計算）<input type="number" min="0" step=".01" data-i="'+i+'" data-k="total" value="'+esc(p.total)+'" placeholder="不需填寫，使用自動計算"></label><p class="hint">只有折扣、組合優惠或特殊情況才需要填寫；一般訂單保持空白。</p></details>'+
       '<label>處理方式<select data-i="'+i+'" data-k="mode"><option value="add" '+(p.mode==='add'?'selected':'')+'>新增</option><option value="edit" '+(p.mode==='edit'?'selected':'')+'>修改原訂單</option><option value="cancel" '+(p.mode==='cancel'?'selected':'')+'>取消原訂單</option></select></label>'+
@@ -222,6 +251,11 @@ function drawCandidates(){
    const p=proposals[Number(n.dataset.i)];p.item=n.value.trim();p.catalogHint='';p.catalogStatus='';
    normalizeCandidateItem(p);drawCandidates();
  }));
+ $('candidates').querySelectorAll('[data-new-category]').forEach(n=>n.onchange=()=>{
+   const regular=n.closest('.new-menu-fields').querySelector('[data-regular-label]');
+   regular.classList.toggle('hidden',n.value!=='貝果'&&n.value!=='甜點');
+ });
+ $('candidates').querySelectorAll('[data-create-menu]').forEach(n=>n.onclick=()=>createCandidateMenu(Number(n.dataset.createMenu),n));
  $('candidates').querySelectorAll('[data-group-check]').forEach(n=>n.onchange=()=>{
    groupCandidateIndices()[Number(n.dataset.groupCheck)].forEach(i=>{proposals[i].check=n.checked});
    drawCandidates();
@@ -244,7 +278,7 @@ function candidateIssues(p){
  const date=String(p.date||'').trim();
  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||Number.isNaN(new Date(date+'T12:00:00').getTime())||new Date(date+'T12:00:00').getFullYear()!==Number(date.slice(0,4))||new Date(date+'T12:00:00').getMonth()+1!==Number(date.slice(5,7))||new Date(date+'T12:00:00').getDate()!==Number(date.slice(8,10)))issues.push('缺少或無效的取餐日期');
  if(!String(p.item||'').trim())issues.push('缺少品項');
- if(p.catalogStatus==='ambiguous'||p.catalogStatus==='unknown')issues.push('請先從菜單選擇正確商品（原始品名已保留）');
+ if(p.catalogStatus==='ambiguous'||p.catalogStatus==='unknown')issues.push(p.catalogStatus==='unknown'?'請從此品項下方直接新增菜單，或選擇正確商品':'請從菜單選擇正確商品（原始品名已保留）');
  if(!Number.isInteger(p.qty)||p.qty<1||p.qty>999)issues.push('數量無效');
  if(['edit','cancel'].includes(p.mode)&&!p.target)issues.push('修改／取消未選擇原訂單');
  return issues;
