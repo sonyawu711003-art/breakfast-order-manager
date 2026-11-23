@@ -71,3 +71,21 @@ test('save failure keeps unmatched item and displays error', async () => {
   assert.match(s.fields['[data-menu-error]'].textContent, /permission denied/);
   assert.equal(s.button.disabled, false);
 });
+
+test('choosing custom item preserves original name and leaves manual price blank', () => {
+  const item = {item: '特製韓式吐司抹奶油就好(奶素)', unmatchedItem: '特製韓式吐司抹奶油就好(奶素)', notes: '11/24 特製韓式吐司抹奶油就好', qty: 1};
+  const ctx = {
+    proposals: [item],
+    normalizeCandidateItem(p) {p.catalogStatus = 'matched'; p.price = ''},
+    drawCandidates() {ctx.drawn = true},
+  };
+  const choice = html.slice(html.indexOf('function chooseCandidateItem('), html.indexOf('const menuCategories='));
+  vm.runInNewContext(choice + '\nglobalThis.chooseCandidateItem = chooseCandidateItem;', ctx);
+  ctx.chooseCandidateItem(0, '客製');
+  assert.equal(item.item, '客製');
+  assert.equal(item.price, '');
+  assert.equal(item.qty, 1);
+  assert.match(item.notes, /^原品項：特製韓式吐司抹奶油就好\(奶素\)/);
+  assert.match(item.notes, /11\/24/);
+  assert.match(item.catalogHint, /手動填寫/);
+});

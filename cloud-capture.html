@@ -71,6 +71,7 @@ function normalizeCandidateItem(p){
   p.flag=Boolean(p.baseFlag);if(!p.baseFlag)p.reason='';
   p.catalogStatus='matched';p.catalogHint=initial===p.item?'':'由「'+initial+'」對應正式菜單「'+p.item+'」';
  }else{
+  p.unmatchedItem=initial;
   p.catalogStatus=found.status;
   p.catalogHint=found.status==='ambiguous'?'「'+initial+'」可能是：'+found.matches.map(x=>x.name).join('、')+'；請從下拉選單確認正式品名':'「'+initial+'」尚未匹配到菜單；可直接新增正式菜單品項，原始數量與備註會保留';
   p.price='';p.flag=true;p.reason=p.catalogHint;
@@ -150,6 +151,17 @@ function menuChoiceOptions(original){
  const categories=[...new Set(remaining.map(x=>x.category))].sort((a,b)=>a.localeCompare(b,'zh-TW'));
  return suggestions+categories.map(cat=>'<optgroup label="'+esc(cat)+'">'+remaining.filter(x=>x.category===cat).map(option).join('')+'</optgroup>').join('');
 }
+function chooseCandidateItem(i,name){
+ const p=proposals[i];if(!p||!name)return;
+ const original=p.unmatchedItem||p.item;
+ if(name==='客製'&&original!=='客製'){
+  const originalNote='原品項：'+original;
+  if(!p.notes.includes(originalNote))p.notes=originalNote+(p.notes?'\n'+p.notes:'');
+ }
+ p.item=name;p.catalogHint='';normalizeCandidateItem(p);
+ if(name==='客製')p.catalogHint='已列為客製；請手動填寫本筆單價，並核對原品項與客製內容';
+ drawCandidates();
+}
 const menuCategories=['貝果','三明治','漢堡','吐司','沙拉','輕食','沙拉加購','韓式吐司','小漢堡','輕食堡','歐式','飲品','飲料','甜點','禮盒','小禮盒','其他'];
 function newMenuFields(i){return '<details class="new-menu-fields"><summary>➕ 菜單沒有這個品項？直接新增</summary><p class="hint">新增後會直接套用到此候選品項；既有訂單價格不會更動。</p>'+
  '<label>正式品名<input data-new-name="'+i+'" maxlength="150" value="'+esc(proposals[i].item)+'"></label>'+
@@ -225,6 +237,7 @@ function drawCandidates(){
       '<label>單價<input type="number" min="0" step=".01" data-i="'+i+'" data-k="price" value="'+esc(p.price)+'"></label><div><label>品項小計（自動計算）</label><div class="auto-subtotal" data-i="'+i+'" data-subtotal="true">'+(candidateAmount(p)===null?'⚠️ 單價待確認':money(candidateAmount(p)))+'</div></div></div>'+
       '<p class="hint" style="margin:7px 0;color:'+(p.catalogStatus==='matched'?'#6c7751':'#b25b2d')+'">'+(p.catalogHint?'📋 '+esc(p.catalogHint):'')+'</p>'+ 
       (p.catalogStatus==='ambiguous'||p.catalogStatus==='unknown'?'<label class="candidate-menu-confirm">⚠️ 未確認正式菜單品項（原文：'+esc(p.item)+'）<select data-i="'+i+'" data-k="chooseItem" required><option value="">請選擇對應的正式品項</option>'+menuChoiceOptions(p.item)+'</select></label>':'')+
+      (p.catalogStatus==='unknown'&&menu.some(m=>m.name==='客製')?'<button class="alt" type="button" data-custom-item="'+i+'">當作客製（單價手動填）</button>':'')+
       (p.catalogStatus==='unknown'?newMenuFields(i):'')+
       '<div class="row"><span class="hint">'+(p.total!==''?'🧾 此筆使用特別金額（覆蓋自動計算）':'✅ 數量 × 單價，自動計算')+'</span><span class="hint">'+(p.flag?'⚠️ '+esc(p.reason||'需核對'):'待審核')+'</span></div>'+ 
       '<details class="total-override" '+(p.total!==''?'open':'')+'><summary>特殊折扣／組合優惠：手動指定本品項總額</summary><label>特別總額（留空即自動計算）<input type="number" min="0" step=".01" data-i="'+i+'" data-k="total" value="'+esc(p.total)+'" placeholder="不需填寫，使用自動計算"></label><p class="hint">只有折扣、組合優惠或特殊情況才需要填寫；一般訂單保持空白。</p></details>'+
@@ -244,9 +257,9 @@ function drawCandidates(){
    }
  }));
  $('candidates').querySelectorAll('[data-i][data-k="chooseItem"]').forEach(n=>n.addEventListener('change',()=>{
-   if(!n.value)return;const p=proposals[Number(n.dataset.i)];
-   p.item=n.value;p.catalogHint='';normalizeCandidateItem(p);drawCandidates();
+   chooseCandidateItem(Number(n.dataset.i),n.value);
  }));
+ $('candidates').querySelectorAll('[data-custom-item]').forEach(n=>n.onclick=()=>chooseCandidateItem(Number(n.dataset.customItem),'客製'));
  $('candidates').querySelectorAll('[data-i][data-k="item"]').forEach(n=>n.addEventListener('change',()=>{
    const p=proposals[Number(n.dataset.i)];p.item=n.value.trim();p.catalogHint='';p.catalogStatus='';
    normalizeCandidateItem(p);drawCandidates();
